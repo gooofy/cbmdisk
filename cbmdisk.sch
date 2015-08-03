@@ -36,7 +36,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
 Title "cbmdisk floppy emulator"
-Date "2 aug 2015"
+Date "3 aug 2015"
 Rev "A (DRAFT)"
 Comp ""
 Comment1 ""
@@ -1145,7 +1145,7 @@ SO
 Text Label 9500 3100 0    60   ~ 0
 SCK
 Text Label 9500 3200 0    60   ~ 0
-RESET
+bRESET
 Text Label 9500 3300 0    60   ~ 0
 GND
 Wire Wire Line
@@ -1196,4 +1196,20 @@ Wire Wire Line
 	3650 5000 4200 5000
 Wire Wire Line
 	4200 5000 4200 5100
+Wire Wire Line
+	6550 3300 7950 3300
+Wire Wire Line
+	7950 3300 7950 3600
+Wire Wire Line
+	7950 3600 10000 3600
+Wire Wire Line
+	10000 3600 10000 3200
+Wire Wire Line
+	10000 3200 9600 3200
+Wire Wire Line
+	5750 3300 5500 3300
+Text Label 5500 3300 0    60   ~ 0
+RESET
+Text Label 1450 1600 0    60   ~ 0
+RESET
 $EndSCHEMATC
