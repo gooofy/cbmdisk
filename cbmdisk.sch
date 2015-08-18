@@ -30,7 +30,8 @@ LIBS:atmel
 LIBS:contrib
 LIBS:valves
 LIBS:7400-ic
-EELAYER 27 0
+LIBS:cbmdisk-cache
+EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
@@ -489,17 +490,6 @@ F 3 "~" H 2050 1050 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L GND #PWR13
-U 1 1 55A6EE65
-P 2050 1350
-F 0 "#PWR13" H 2050 1350 30  0001 C CNN
-F 1 "GND" H 2050 1280 30  0001 C CNN
-F 2 "" H 2050 1350 60  0000 C CNN
-F 3 "" H 2050 1350 60  0000 C CNN
-	1    2050 1350
-	1    0    0    -1  
-$EndComp
-$Comp
 L R R2
 U 1 1 55A6F14B
 P 1400 1350
@@ -910,13 +900,13 @@ $EndComp
 Text Label 8550 2900 0    60   ~ 0
 CLKOUT
 Wire Wire Line
-	1050 1900 1400 1900
+	1000 1900 1400 1900
 Wire Wire Line
 	1400 1900 1400 2000
 Wire Wire Line
 	1400 2000 1650 2000
 Wire Wire Line
-	1050 2500 1400 2500
+	1000 2500 1400 2500
 Wire Wire Line
 	1400 2500 1400 2400
 Wire Wire Line
@@ -1024,13 +1014,11 @@ Wire Wire Line
 	4500 4800 4650 4800
 Wire Wire Line
 	2650 850  2650 1300
-Wire Wire Line
-	2050 1350 2050 1250
 Connection ~ 2450 850 
 Wire Wire Line
 	1400 1600 1650 1600
 Wire Wire Line
-	1400 1000 1400 1100
+	1400 1000 1400 1200
 Wire Wire Line
 	750  1600 800  1600
 Wire Wire Line
@@ -1066,7 +1054,7 @@ Wire Wire Line
 Wire Wire Line
 	5100 3650 5100 3700
 Wire Wire Line
-	4650 4100 4750 4100
+	4550 4100 4750 4100
 Wire Wire Line
 	5200 4100 5150 4100
 Wire Wire Line
@@ -1084,9 +1072,9 @@ Wire Wire Line
 Wire Wire Line
 	6950 700  8000 700 
 Wire Wire Line
-	7850 1150 7850 1100
+	7850 1050 7850 1150
 Wire Wire Line
-	8900 1150 8900 1100
+	8900 1050 8900 1150
 Wire Wire Line
 	8800 700  9400 700 
 Wire Wire Line
@@ -1175,7 +1163,7 @@ ETH_INT
 Wire Wire Line
 	9600 2900 9850 2900
 Wire Wire Line
-	4150 4100 3650 4100
+	3650 4100 4250 4100
 Wire Wire Line
 	5750 3200 3650 3200
 Text Notes 6300 4500 0    60   ~ 0
@@ -1212,4 +1200,43 @@ Text Label 5500 3300 0    60   ~ 0
 RESET
 Text Label 1450 1600 0    60   ~ 0
 RESET
+Wire Wire Line
+	7250 700  7250 800 
+Connection ~ 7250 700 
+Wire Wire Line
+	7250 1100 7250 1200
+Wire Wire Line
+	8900 700  8900 750 
+Connection ~ 8900 700 
+Wire Wire Line
+	7850 700  7850 750 
+Connection ~ 7850 700 
+Wire Wire Line
+	10350 1050 10350 1100
+Wire Wire Line
+	10350 750  10350 700 
+Connection ~ 10350 700 
+Wire Wire Line
+	650  1900 700  1900
+Connection ~ 1050 1900
+Connection ~ 1050 2500
+Wire Wire Line
+	700  2500 650  2500
+Wire Wire Line
+	1400 1500 1400 1600
+Wire Wire Line
+	2050 850  2050 900 
+$Comp
+L GND #PWR?
+U 1 1 55CDB00D
+P 2050 1250
+F 0 "#PWR?" H 2050 1000 50  0001 C CNN
+F 1 "GND" H 2050 1100 50  0000 C CNN
+F 2 "" H 2050 1250 60  0000 C CNN
+F 3 "" H 2050 1250 60  0000 C CNN
+	1    2050 1250
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2050 1200 2050 1250
 $EndSCHEMATC
