@@ -1,24 +1,42 @@
-/* NODISKEMU - SD/MMC to IEEE-488 interface/controller
-   Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
-
-   NODISKEMU is a fork of sd2iec by Ingo Korb (et al.), http://sd2iec.de
-
-   Inspired by MMC2IEC by Lars Pontoppidan et al.
-
-   FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License only.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+/*
+ * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015 Guenter Bartsch
+ * 
+ * Most of the code originates from:
+ *
+ * NODISKEMU - SD/MMC to IEEE-488 interface/controller
+ * Copyright (c) 2015 Nils Eilers. 
+ *
+ * which is based on:
+ *
+ * sd2iec by Ingo Korb (et al.), http://sd2iec.de
+ * Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
+ *
+ * Inspired by MMC2IEC by Lars Pontoppidan et al.
+ * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
+ *
+ * Network code is based on ETH_M32_EX 
+ * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
+ *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
 
 
    buffers.c: Internal buffer management
@@ -43,6 +61,10 @@ static uint8_t bufferdata[CONFIG_BUFFER_COUNT*256];
 
 /// Number of active data buffers + 16 * number of dirty buffers
 uint8_t active_buffers;
+
+static inline __attribute__((always_inline)) void update_leds(void) {
+  set_busy_led(active_buffers != 0);
+}
 
 /**
  * callback_dummy - dummy function for the buffer callbacks
@@ -216,6 +238,7 @@ void free_buffer(buffer_t *buffer) {
     active_buffers -= 16;
   if (buffer->secondary < BUFFER_SEC_SYSTEM)
     active_buffers--;
+	update_leds();
 
 }
 
@@ -280,7 +303,7 @@ void mark_buffer_dirty(buffer_t *buf) {
   if (!buf->dirty) {
     buf->dirty = 1;
     active_buffers += 16;
-    set_dirty_led(1);
+		update_leds();
   }
 }
 
@@ -295,7 +318,6 @@ void mark_buffer_clean(buffer_t *buf) {
   if (buf->dirty) {
     buf->dirty = 0;
     active_buffers -= 16;
-    if (get_dirty_buffer_count() == 0)
-      set_dirty_led(0);
+		update_leds();
   }
 }

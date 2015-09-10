@@ -1,26 +1,44 @@
-/*----------------------------------------------------------------------------
- Copyright:      Radig Ulrich  mailto: mail@ulrichradig.de
- Author:         Radig Ulrich
- Remarks:        
- known Problems: none
- Version:        24.10.2007
- Description:    Ethernet Stack
+/*
+ * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015 Guenter Bartsch
+ * 
+ * Most of the code originates from:
+ *
+ * NODISKEMU - SD/MMC to IEEE-488 interface/controller
+ * Copyright (c) 2015 Nils Eilers. 
+ *
+ * which is based on:
+ *
+ * sd2iec by Ingo Korb (et al.), http://sd2iec.de
+ * Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
+ *
+ * Inspired by MMC2IEC by Lars Pontoppidan et al.
+ * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
+ *
+ * Network code is based on ETH_M32_EX 
+ * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
+ *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
 
- Dieses Programm ist freie Software. Sie können es unter den Bedingungen der 
- GNU General Public License, wie von der Free Software Foundation veröffentlicht, 
- weitergeben und/oder modifizieren, entweder gemäß Version 2 der Lizenz oder 
- (nach Ihrer Option) jeder späteren Version. 
-
- Die Veröffentlichung dieses Programms erfolgt in der Hoffnung, 
- daß es Ihnen von Nutzen sein wird, aber OHNE IRGENDEINE GARANTIE, 
- sogar ohne die implizite Garantie der MARKTREIFE oder der VERWENDBARKEIT 
- FÜR EINEN BESTIMMTEN ZWECK. Details finden Sie in der GNU General Public License. 
-
- Sie sollten eine Kopie der GNU General Public License zusammen mit diesem 
- Programm erhalten haben. 
- Falls nicht, schreiben Sie an die Free Software Foundation, 
- Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA. 
-------------------------------------------------------------------------------*/
 
 #include <avr/interrupt.h>
 #include <string.h>
@@ -899,8 +917,6 @@ void tcp_socket_process(void)
 		return;
 	}	
 
-	printf ("TCP 1\r\n");
-
 	//Server öffnet Port
 	if((tcp->TCP_HdrFlags & SYN_FLAG) && (tcp->TCP_HdrFlags & ACK_FLAG))
 	{	
@@ -940,7 +956,7 @@ void tcp_socket_process(void)
 
 		DEBUG("TCP New SERVER Connection! STACK:%i\r\n",index);
 
-		printf ("   GOT SYN, SEND SYN-ACK\r\n");
+		//printf ("   GOT SYN, SEND SYN-ACK\r\n");
 
 		tcp_entry[index].status =  ACK_FLAG | SYN_FLAG;
 		create_new_tcp_packet(0,index);

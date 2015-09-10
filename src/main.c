@@ -18,6 +18,12 @@
  * Network code is based on ETH_M32_EX 
  * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; version 2 of the License only.
@@ -53,16 +59,8 @@
 #include "eeprom-conf.h"
 #include "ff.h"
 #include "parser.h"
-
-#if 0
-#include "diskchange.h"
-#include "errormsg.h"
-#include "fatops.h"
-#include "led.h"
-#include "system.h"
-#include "ustring.h"
-#include "utils.h"
-#endif
+#include "doscmd.h"
+#include "fileops.h"
 
 int main(void)
 {  
@@ -105,38 +103,6 @@ int main(void)
   printf("MASK %1i.%1i.%1i.%1i\r\n", netmask[0]  , netmask[1]  , netmask[2]  , netmask[3]);
   printf("GW   %1i.%1i.%1i.%1i\r\n", router_ip[0], router_ip[1], router_ip[2], router_ip[3]);
 
-	/*
-   * fatfs test FIXME: remove
-   */
-
-#if 0
-	{
-		FRESULT res;
-		DIR     mydir;
-		FILINFO myfi;
-
-  	//res = f_mount (0, &myfs);
-		res = f_opendir (&partition[0].fatfs, &mydir, "/");
-
-		printf ("f_opendir result: %d\r\n", res);
-
-		do {
-			res = f_readdir(&mydir, &myfi);
-
-			if (myfi.fname[0] == 0) {
-				printf ("END\r\n");
-				break;
-			}
-			printf ("%s\r\n", &myfi.fname);
-			uart_flush();
-
-		} while (res == FR_OK);
-
-		f_closedir(&mydir);
-
-	}
-#endif
-
   set_busy_led(0);
 
 	bus_mainloop();
@@ -144,37 +110,6 @@ int main(void)
 	printf("mainloop done ?!\r\n");
 
 	while (1);
-#if 0
-	while(1)
-	{
-		eth_get_data();
-
-		if(ping.result)
-		{
-			printf("Get PONG: %i.%i.%i.%i\r\n",ping.ip1[0],ping.ip1[1],ping.ip1[2],ping.ip1[3]); 
-			ping.result = 0;
-		}
-
-		// called once per second
-		if (eth_time != time_update)
-		{
-			time_update = eth_time;
-			if(eth.no_reset)
-			{
-				reset_counter = 0;
-				eth.no_reset = 0;
-			}
-			else
-			{
-				if((reset_counter++)>5)
-				{
-					reset_counter = 0;
-					enc_init();
-				}
-			}
-		}			
-	}//while (1)
-#endif
 
 	return(0);
 }

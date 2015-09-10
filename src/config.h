@@ -18,6 +18,12 @@
  * Network code is based on ETH_M32_EX 
  * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; version 2 of the License only.
@@ -32,7 +38,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-
 
 #ifndef _CONFIG_H_
 #define _CONFIG_H_	
@@ -126,9 +131,6 @@ static inline __attribute__((always_inline)) void sdcard_set_ss(uint8_t state) {
 
 #define set_sd_led(x) do {} while (0)
 
-// The busy-LED and the UART's TxD share the same port pin, so light the
-// LED only when debug messages are de-selected:
-
 static inline void leds_init(void) {
   DDRC |= _BV(PC7);
 }
@@ -138,12 +140,6 @@ static inline __attribute__((always_inline)) void set_busy_led(uint8_t state) {
     PORTC |= _BV(PC7);
   else
     PORTC &= ~_BV(PC7);
-}
-
-static inline __attribute__((always_inline)) void set_dirty_led(uint8_t state) {
-}
-
-static inline void toggle_dirty_led(void) {
 }
 
 #ifdef CONFIG_HAVE_IEEE

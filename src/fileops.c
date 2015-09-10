@@ -1,30 +1,43 @@
-/* NODISKEMU - SD/MMC to IEEE-488 interface/controller
-   Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
-
-   NODISKEMU is a fork of sd2iec by Ingo Korb (et al.), http://sd2iec.de
-
-   Inspired by MMC2IEC by Lars Pontoppidan et al.
-
-   FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License only.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-
-   fileops.c: Generic file operations
-
-*/
-
+/*
+ * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015 Guenter Bartsch
+ * 
+ * Most of the code originates from:
+ *
+ * NODISKEMU - SD/MMC to IEEE-488 interface/controller
+ * Copyright (c) 2015 Nils Eilers. 
+ *
+ * which is based on:
+ *
+ * sd2iec by Ingo Korb (et al.), http://sd2iec.de
+ * Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
+ *
+ * Inspired by MMC2IEC by Lars Pontoppidan et al.
+ * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
+ *
+ * Network code is based on ETH_M32_EX 
+ * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
+ *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
 #include <ctype.h>
 #include <stdint.h>
 #include <string.h>
@@ -37,7 +50,6 @@
 #include "fatops.h"
 #include "flags.h"
 #include "ff.h"
-#include "m2iops.h"
 #include "parser.h"
 #include "progmem.h"
 #include "uart.h"
@@ -163,6 +175,7 @@ static void createentry(cbmdirent_t *dent, buffer_t *buf, dirformat_t format) {
   if (dent->blocksize < 10)
     data++;
   *data++ = '"';
+
 
   /* copy and adjust the filename - C783 */
   memcpy(data, dent->name, CBM_NAME_LENGTH);
@@ -454,7 +467,6 @@ static void load_directory(uint8_t secondary) {
   path_t path;
   uint8_t pos=1;
 
-	uart_puthex(secondary); uart_puts_P(PSTR("load_directory\r\n"));
   buf = alloc_buffer();
   if (!buf) {
 	  uart_puts_P(PSTR("buf NULL 2\r\n"));
@@ -667,7 +679,6 @@ scandone:
   /* Keep the buffer around */
   stick_buffer(buf);
 
-	uart_puthex(secondary); uart_puts_P(PSTR("load_directory DONE\r\n"));
   return;
 
 }
@@ -925,15 +936,6 @@ void file_open(uint8_t secondary) {
   if (parse_path(command_buffer, &path, &fname, 0))
       return;
 
-#ifdef CONFIG_M2I
-  /* For M2I only: Remove trailing spaces from name */
-  if (partition[path.part].fop == &m2iops) {
-    res = ustrlen(fname);
-    while (--res && fname[res] == ' ')
-      fname[res] = 0;
-  }
-#endif
-
   /* Filename matching */
   if (opendir(&matchdh, &path))
     return;
@@ -1006,12 +1008,6 @@ void file_open(uint8_t secondary) {
         if (file_delete(&path, &dentcopy) == 255)
           return;
 
-#ifdef CONFIG_M2I
-        /* Force fatops to create a new name based on the (long) CBM- */
-        /* name instead of creating one with the old SFN and no LFN.  */
-        if (dent.opstype == OPSTYPE_FAT || dent.opstype == OPSTYPE_FAT_X00)
-          dent.pvt.fat.realname[0] = 0;
-#endif
       } else {
         /* Write existing file without replacement: Raise error */
         set_error(ERROR_FILE_EXISTS);

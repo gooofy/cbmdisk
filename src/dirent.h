@@ -1,25 +1,43 @@
-/* NODISKEMU - SD/MMC to IEEE-488 interface/controller
-   Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
-
-   NODISKEMU is a fork of sd2iec by Ingo Korb (et al.), http://sd2iec.de
-
-   Inspired by MMC2IEC by Lars Pontoppidan et al.
-
-   FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License only.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
+/*
+ * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015 Guenter Bartsch
+ * 
+ * Most of the code originates from:
+ *
+ * NODISKEMU - SD/MMC to IEEE-488 interface/controller
+ * Copyright (c) 2015 Nils Eilers. 
+ *
+ * which is based on:
+ *
+ * sd2iec by Ingo Korb (et al.), http://sd2iec.de
+ * Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
+ *
+ * Inspired by MMC2IEC by Lars Pontoppidan et al.
+ * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
+ *
+ * Network code is based on ETH_M32_EX 
+ * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
+ *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
 
    dirent.h: Various data structures for directory browsing
 
@@ -47,9 +65,6 @@
 
 /* Internal file types used for the partition directory */
 #define TYPE_NAT 8
-
-/* Internal file type used to force files without header on FAT (for M2I) */
-#define TYPE_RAW 15
 
 /// Hidden is an unused bit on CBM
 #define FLAG_HIDDEN (1<<5)
@@ -129,7 +144,6 @@ typedef enum {
   OPSTYPE_FAT,
   OPSTYPE_FAT_X00,  /* X00 files can never be disk images */
                     /* and should match case-sensitive    */
-  OPSTYPE_M2I,
   OPSTYPE_DXX,
   OPSTYPE_EEFS
 } opstype_t;
@@ -146,7 +160,6 @@ typedef enum {
  * @pvt.fat.cluster : Start cluster of the entry
  * @pvt.fat.realname: Actual 8.3 name of the file (preferred if present)
  * @pvt.dxx.dh      : Dxx directory handle for the dir entry of this file
- * @pvt.m2i.offset  : Offset in the M2I file
  *
  * This structure holds a CBM filename, its type and its size. The typeflags
  * are almost compatible to the file type byte in a D64 image, but the splat
@@ -176,9 +189,6 @@ typedef struct {
     struct {
       struct d64dh dh;
     } dxx;
-    struct {
-      uint16_t offset;
-    } m2i;
   } pvt;
 } cbmdirent_t;
 
@@ -205,7 +215,6 @@ typedef struct d64fh {
  * struct dh_t - union of all directory handles
  * @part: partition number for the handle
  * @fat : fat directory handle
- * @m2i : m2i directory handle (offset of entry in the file)
  * @d64 : d64 directory handle
  *
  * This is a union of directory handles for all supported file types
@@ -216,7 +225,6 @@ typedef struct dh_s {
   uint8_t part;
   union {
     DIR          fat;
-    uint16_t     m2i;
     struct d64dh d64;
   } dir;
 } dh_t;

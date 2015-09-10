@@ -18,6 +18,12 @@
  * Network code is based on ETH_M32_EX 
  * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; version 2 of the License only.
@@ -31,7 +37,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
-
+ *
    errormsg.c: Generates Commodore-compatible error messages
 
 */
@@ -259,14 +265,6 @@ void set_error_ts(uint8_t errornum, uint8_t track, uint8_t sector) {
   msg = appendnumber(msg,sector);
   *msg = 13;
 
-  if (errornum >= 20 && errornum != ERROR_DOSVERSION) {
-    // FIXME: Compare to E648
-    // NOTE: 1571 doesn't write the BAM and closes some buffers if an error occured
-    //FIXME led_state |= LED_ERROR;
-  } else {
-    //FIXME led_state &= (uint8_t)~LED_ERROR;
-    //set_error_led(0);
-  }
   buffers[ERRORBUFFER_IDX].lastused = msg - error_buffer;
 
 }

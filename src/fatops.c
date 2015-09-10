@@ -1,27 +1,43 @@
-/* NODISKEMU - SD/MMC to IEEE-488 interface/controller
-   Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
-   ASCII/PET conversion Copyright (C) 2008 Jim Brain <brain@jbrain.com>
-
-   NODISKEMU is a fork of sd2iec by Ingo Korb (et al.), http://sd2iec.de
-
-   Inspired by MMC2IEC by Lars Pontoppidan et al.
-
-   FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License only.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-
+/*
+ * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015 Guenter Bartsch
+ * 
+ * Most of the code originates from:
+ *
+ * NODISKEMU - SD/MMC to IEEE-488 interface/controller
+ * Copyright (c) 2015 Nils Eilers. 
+ *
+ * which is based on:
+ *
+ * sd2iec by Ingo Korb (et al.), http://sd2iec.de
+ * Copyright (C) 2007-2014  Ingo Korb <ingo@akana.de>
+ *
+ * Inspired by MMC2IEC by Lars Pontoppidan et al.
+ * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
+ *
+ * Network code is based on ETH_M32_EX 
+ * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
+ *
+ * JiffyDos send based on code by M.Kiesel
+ * Fat LFN support and lots of other ideas+code by Jim Brain 
+ * Final Cartridge III fastloader support by Thomas Giesel 
+ * Original IEEE488 support by Nils Eilers 
+ * FTP server and most of the IEEE 488 FSM implementation by G. Bartsch.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
    fatops.c: FAT operations
 
 */
@@ -39,7 +55,6 @@
 #include "ff.h"
 #include "fileops.h"
 #include "flags.h"
-#include "m2iops.h"
 #include "p00cache.h"
 #include "parser.h"
 #include "progmem.h"
@@ -177,9 +192,8 @@ static exttype_t check_extension(uint8_t *name, uint8_t **ext) {
  * @name: pointer to the file name
  *
  * This function checks if the given file name has an extension that
- * indicates a known image file type. Returns IMG_IS_M2I for M2I files,
- * IMG_IS_DISK for D64/D41/D71/D81 files or IMG_UNKNOWN for an unknown
- * file extension.
+ * indicates a known image file type. Returns IMG_IS_DISK for D64/D41/D71/D81
+ * files or IMG_UNKNOWN for an unknown file extension.
  */
 imgtype_t check_imageext(uint8_t *name) {
   uint8_t f,s,t;
@@ -191,11 +205,6 @@ imgtype_t check_imageext(uint8_t *name) {
   f = toupper(*++ext);
   s = toupper(*++ext);
   t = toupper(*++ext);
-
-#ifdef CONFIG_M2I
-  if (f == 'M' && s == '2' && t == 'I')         // M2I
-    return IMG_IS_M2I;
-#endif
 
   if (f == 'D')
     if ((s == '6' && t == '4') ||               // D64
@@ -293,12 +302,6 @@ static bool is_valid_fat_name(const uint8_t *name) {
 static uint8_t* build_name(uint8_t *name, uint8_t type) {
   /* convert to PETSCII */
   pet2asc(name);
-
-#ifdef CONFIG_M2I
-  /* do not add a header for raw files, even if the name may be invalid */
-  if (type == TYPE_RAW)
-    return NULL;
-#endif
 
   /* known disk-image extensions are always without header or suffix */
   if (type == TYPE_PRG && check_imageext(name) != IMG_UNKNOWN)
@@ -655,17 +658,11 @@ FRESULT create_file(path_t *path, cbmdirent_t *dent, uint8_t type, buffer_t *buf
 
   x00ext = NULL;
 
-  /* check if the FAT name is already defined (used only for M2I) */
-#ifdef CONFIG_M2I
-  if (dent->pvt.fat.realname[0])
-    name = dent->pvt.fat.realname;
-  else
-#endif
-  {
-    ustrcpy(ops_scratch, dent->name);
-    x00ext = build_name(ops_scratch, type);
-    name = ops_scratch;
-  }
+	ustrcpy(ops_scratch, dent->name);
+	x00ext = build_name(ops_scratch, type);
+	name = ops_scratch;
+
+	//printf ("create_file: name=%s\r\n", name);
 
   partition[path->part].fatfs.curr_dir = path->dir.fat;
   do {
@@ -724,6 +721,8 @@ FRESULT create_file(path_t *path, cbmdirent_t *dent, uint8_t type, buffer_t *buf
  */
 void fat_open_write(path_t *path, cbmdirent_t *dent, uint8_t type, buffer_t *buf, uint8_t append) {
   FRESULT res;
+
+	//printf ("fat_open_write: %s\r\n", &dent->name);
 
   if (append) {
     partition[path->part].fatfs.curr_dir = path->dir.fat;
@@ -1007,7 +1006,6 @@ uint8_t fat_delete(path_t *path, cbmdirent_t *dent) {
   FRESULT res;
   uint8_t *name;
 
-  set_dirty_led(1);
   if (dent->pvt.fat.realname[0]) {
     name = dent->pvt.fat.realname;
     p00cache_invalidate();
@@ -1033,7 +1031,7 @@ uint8_t fat_delete(path_t *path, cbmdirent_t *dent) {
  * @dent: Name of the directory/image to be changed into
  *
  * This function changes the directory of the path object to dirname.
- * If dirname specifies a file with a known extension (e.g. M2I or D64), the
+ * If dirname specifies a file with a known extension (e.g. D64), the
  * current(!) directory will be changed to the directory of the file and
  * it will be mounted as an image file. Returns 0 if successful,
  * 1 otherwise.
@@ -1071,7 +1069,7 @@ uint8_t fat_chdir(path_t *path, cbmdirent_t *dent) {
   } else {
     /* Changing into a file, could be a mount request */
     if (check_imageext(dent->pvt.fat.realname) != IMG_UNKNOWN) {
-      /* D64/M2I mount request */
+      /* D64 mount request */
       free_multiple_buffers(FMB_USER_CLEAN);
       /* Open image file */
       res = f_open(&partition[path->part].fatfs,
@@ -1089,16 +1087,9 @@ uint8_t fat_chdir(path_t *path, cbmdirent_t *dent) {
         return 1;
       }
 
-#ifdef CONFIG_M2I
-      if (check_imageext(dent->pvt.fat.realname) == IMG_IS_M2I)
-        partition[path->part].fop = &m2iops;
-      else
-#endif
-        {
-          if (d64_mount(path))
-            return 1;
-          partition[path->part].fop = &d64ops;
-        }
+			if (d64_mount(path))
+				return 1;
+			partition[path->part].fop = &d64ops;
 
       return 0;
     }
@@ -1611,7 +1602,7 @@ void format_dummy(uint8_t drive, uint8_t *name, uint8_t *id) {
   set_error(ERROR_SYNTAX_UNKNOWN);
 }
 
-const PROGMEM fileops_t fatops = {  // These should be at bottom, to be consistent with d64ops and m2iops
+const PROGMEM fileops_t fatops = {  // These should be at bottom, to be consistent with d64ops 
   &fat_open_read,
   &fat_open_write,
   &fat_open_rel,
