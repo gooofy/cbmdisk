@@ -7,4 +7,7 @@ syntax: glob
 *.eep
 *.lss
 *.map
+.dep
+*.hex
+*.sym
 arc
