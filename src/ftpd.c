@@ -62,7 +62,7 @@
 #include "fileops.h"
 #include "utils.h"
 
-//#define DEBUG_FTPD 
+#define DEBUG_FTPD 
 
 
 #ifdef DEBUG_FTPD
@@ -72,7 +72,7 @@
 # define DEBUG_PUTC(x)   uart_putc(x)
 # define DEBUG_FLUSH()   uart_flush()
 # define DEBUG_PUTCRLF() uart_putcrlf()
-# define DEBUG_PRINTF(fmt, ...) printf(fmt, __VA_ARGS__)
+# define DEBUG_PRINTF(...) printf(__VA_ARGS__)
 #else
 # define DEBUG_PUTS_P(x) do {} while (0)
 # define DEBUG_PUTS(x) do {} while (0)
@@ -80,7 +80,7 @@
 # define DEBUG_PUTC(x) do {} while (0)
 # define DEBUG_FLUSH() do {} while (0)
 # define DEBUG_PUTCRLF() do {} while (0)
-# define DEBUG_PRINTF(fmt, ...) while(0)
+# define DEBUG_PRINTF(...) while(0)
 #endif
 
 #define FTPD_PORT                    21
@@ -89,10 +89,13 @@
 #define MAX_CMD_BUF 255
 #define FTP_SA      7
 
-#define STATE_START	     	1
-#define STATE_LIST_START  2
-#define STATE_LIST_FIN    4
-#define STATE_STOR       10
+#define STATE_START	     	 1
+#define STATE_LIST_START   2
+#define STATE_LIST_FIN     4
+#define STATE_STOR        10
+
+#define STATE_RETR_START  20
+#define STATE_RETR_FIN    21
 
 typedef struct {
 
@@ -227,6 +230,41 @@ static uint8_t dir_send_packet (uint8_t idx) {
 	return 1;
 }
 
+static uint8_t retr_send_packet (uint8_t idx) {
+
+	buffer_t *buf;
+	int n = 0;
+
+	buf = find_buffer(FTP_SA);
+
+	if (!buf) {
+		return 0;
+	} 
+
+	while (buf->position < buf->lastused) {
+		char pc = buf->data[buf->position++];
+		eth_buffer[TCP_DATA_START + (n++)] = pc;
+	}
+
+	create_new_tcp_packet(n, idx);
+	tcp_entry[idx].time = TCP_TIME_OFF;
+
+	if (buf->sendeoi) {
+		return 0;
+	}
+
+	if (buf->sendeoi && FTP_SA != 15 && !buf->recordlen &&
+			buf->refill != directbuffer_refill) {
+		buf->read = 0;
+		return 0;
+	} 
+	if (buf->refill(buf)) {             // Refill buffer
+		return 0;
+	}
+
+	return 1;
+}
+
 static uint8_t stor_byte (uint8_t c) {
 	buffer_t *buf;
 
@@ -330,6 +368,27 @@ static void ftp_data (unsigned char index)
 				}	
 				create_new_tcp_packet(0,index);
 				break;
+
+			case STATE_RETR_START:
+				if (!retr_send_packet(index)) {
+		
+					buffer_t *buf = find_buffer(FTP_SA);
+					buf->cleanup(buf);
+					free_buffer(buf);
+
+					create_new_tcp_packet(0,index);
+					self->state = STATE_RETR_FIN;
+				}
+				break;
+
+			case STATE_RETR_FIN:
+				self->state = STATE_START;
+				DEBUG_PUTS_P("FTPDATA CLOSE\n\r");
+				tcp_entry[index].app_status = 0xFFFE;
+				tcp_Port_close(index);
+				printf_packet (ctrl_index, "226 Transfer complete.\r\n");
+				break;
+
 		}	
 
 		return;
@@ -371,160 +430,202 @@ static void ftp_ctrl (unsigned char index)
 		return;
 	}	
 
-	if ((tcp_entry[index].app_status > 1) && (tcp_entry[index].status&PSH_FLAG))
-	{
-		tcp_entry[index].app_status = 2;	
-	  DEBUG_PUTC('<');
+	if (tcp_entry[index].app_status > 1) {
+		if (tcp_entry[index].status & PSH_FLAG) {
+			tcp_entry[index].app_status = 2;	
+			DEBUG_PUTC('<');
 
-	  cmd_len = 0;
+			cmd_len = 0;
 
-		for (int a = TCP_DATA_START_VAR;a<(TCP_DATA_END_VAR+1);a++)
-		{
-			unsigned char receive_char;
-			receive_char = eth_buffer[a];
+			for (int a = TCP_DATA_START_VAR;a<(TCP_DATA_END_VAR+1);a++)
+			{
+				unsigned char receive_char;
+				receive_char = eth_buffer[a];
 
-			if (receive_char == 32 || receive_char == 10 || receive_char == 13) {
-				cmd_buf[cmd_len++] = 0;
-				break;
+				if (receive_char == 32 || receive_char == 10 || receive_char == 13) {
+					cmd_buf[cmd_len++] = 0;
+					break;
+				}
+
+				cmd_buf[cmd_len++] = receive_char;
+				DEBUG_PUTC (receive_char);
+			}	
+			DEBUG_PUTS_P ("\n\r");
+			tcp_entry[index].status =  ACK_FLAG;
+			tcp_entry[index].time   = TCP_TIME_OFF;
+
+			switch (self->state) {
+				case STATE_START:
+
+					if (!strncmp(cmd_buf, "USER", 4)) {
+						printf_packet (index, "331 Password please.\r\n");
+					} else if (!strncmp(cmd_buf, "PASS", 4)) {
+						printf_packet (index, "230 Logged in.\r\n");
+					} else if (!strncmp(cmd_buf, "SYST", 4)) {
+						printf_packet (index, "215 CBM 8296\r\n");
+					} else if (!strncmp(cmd_buf, "FEAT", 4)) {
+						printf_packet (index, "211 END\r\n");
+					} else if (!strncmp(cmd_buf, "PWD", 3)) {
+						printf_packet (index, "257 \"%s\" is current directory\r\n", "/");
+					} else if (!strncmp(cmd_buf, "PASV", 4)) {
+						printf_packet (index, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n", myip[0], myip[1], myip[2], myip[3], self->data_port >> 8, self->data_port % 256);
+					} else if (!strncmp(cmd_buf, "ALLO", 4)) {
+						// ignore
+						printf_packet(index, "202 Command not implemented, superfluous at this site.\r\n");
+					} else if (!strncmp(cmd_buf, "LIST", 4)) {
+						printf_packet(index, "150 Opening ASCII mode data connection for list\r\n");
+
+						self->state = STATE_LIST_START;
+
+					} else if (!strncmp(cmd_buf, "RETR", 4)) {
+
+						command_length = 0;
+						
+						for (int a = TCP_DATA_START_VAR + 5; a<(TCP_DATA_END_VAR+1); a++)
+						{
+							unsigned char receive_char;
+							receive_char = eth_buffer[a];
+
+							command_buffer[command_length++] = receive_char;
+							if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
+								break;
+							}
+						}	
+
+						command_buffer[command_length] = 0;
+						printf_packet(index, "150 Opening BINARY mode data connection for %s\r\n", command_buffer);
+
+						asc2pet(command_buffer);
+						self->state = STATE_RETR_START;
+
+					} else if ((!strncmp(cmd_buf, "MKD", 3)) || (!strncmp(cmd_buf, "CWD", 3)) || (!strncmp(cmd_buf, "RMD", 3)) ) {
+
+						command_length = 2;
+						command_buffer[0] = cmd_buf[0];
+						command_buffer[1] = 'D';
+						
+						for (int a = TCP_DATA_START_VAR + 4; a<(TCP_DATA_END_VAR+1); a++)
+						{
+							unsigned char receive_char;
+							receive_char = eth_buffer[a];
+
+							command_buffer[command_length++] = receive_char;
+							if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
+								break;
+							}
+						}	
+
+						parse_doscommand();
+						free_multiple_buffers(FMB_USER_CLEAN);
+
+						printf_packet(index, "257 %s directory operation done.\r\n", command_buffer);
+
+					} else if (!strncmp(cmd_buf, "DELE", 4)) {
+
+						command_length = 2;
+						command_buffer[0] = 's';
+						command_buffer[1] = ':';
+						
+						for (int a = TCP_DATA_START_VAR + 5; a<(TCP_DATA_END_VAR+1); a++)
+						{
+							unsigned char receive_char;
+							receive_char = eth_buffer[a];
+
+							command_buffer[command_length++] = receive_char;
+							if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
+								break;
+							}
+						}	
+
+						command_buffer[command_length] = 0;
+						asc2pet(command_buffer);
+
+						parse_doscommand();
+						free_multiple_buffers(FMB_USER_CLEAN);
+
+						printf_packet(index, "250 %s file deleted.\r\n", command_buffer);
+
+					} else if (!strncmp(cmd_buf, "STOR", 4)) {
+
+						command_length = 0;
+						
+						for (int a = TCP_DATA_START_VAR + 5; a<(TCP_DATA_END_VAR+1); a++)
+						{
+							unsigned char receive_char;
+							receive_char = eth_buffer[a];
+
+							if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
+								break;
+							}
+							command_buffer[command_length++] = receive_char;
+						}	
+						command_buffer[command_length++] = ',';
+						command_buffer[command_length++] = 'p';
+						command_buffer[command_length++] = ',';
+						command_buffer[command_length++] = 'w';
+
+						command_buffer[command_length] = 0;
+						asc2pet(command_buffer);
+
+						for (uint8_t i = 0; i<command_length; i++)
+							DEBUG_PUTC (command_buffer[i]);
+						DEBUG_PUTCRLF();
+						DEBUG_FLUSH();
+
+						file_open(FTP_SA);
+
+						self->state = STATE_STOR;
+						printf_packet(index, "150 READY.\r\n");
+
+					} else {
+						printf("   %s UNK", cmd_buf);
+						printf_packet(index, "502 command not implemented.\r\n");
+					}
+					break;
+				default:
+					printf("   ERROR - unimplemented state %d", self->state);
+					printf_packet(index, "   >421 internal error.\r\n");
+					tcp_entry[index].app_status = 0xFFFE;
+					tcp_Port_close(index);
+
 			}
 
-      cmd_buf[cmd_len++] = receive_char;
-		  DEBUG_PUTC (receive_char);
-		}	
-		DEBUG_PUTS_P ("\n\r");
-		tcp_entry[index].status =  ACK_FLAG;
-		tcp_entry[index].time   = TCP_TIME_OFF;
+		} else {
 
-		switch (self->state) {
-			case STATE_START:
+			// start sending data once ACK for last packet has been received
 
-				if (!strncmp(cmd_buf, "USER", 4)) {
-					printf_packet (index, "331 Password please.\r\n");
-				} else if (!strncmp(cmd_buf, "PASS", 4)) {
-					printf_packet (index, "230 Logged in.\r\n");
-				} else if (!strncmp(cmd_buf, "SYST", 4)) {
-					printf_packet (index, "215 CBM 8296\r\n");
-				} else if (!strncmp(cmd_buf, "FEAT", 4)) {
-					printf_packet (index, "211 END\r\n");
-				} else if (!strncmp(cmd_buf, "PWD", 3)) {
-					printf_packet (index, "257 \"%s\" is current directory\r\n", "/");
-				} else if (!strncmp(cmd_buf, "PASV", 4)) {
-					printf_packet (index, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n", myip[0], myip[1], myip[2], myip[3], self->data_port >> 8, self->data_port % 256);
-				} else if (!strncmp(cmd_buf, "ALLO", 4)) {
-					// ignore
-					printf_packet(index, "202 Command not implemented, superfluous at this site.\r\n");
-				} else if (!strncmp(cmd_buf, "LIST", 4)) {
-					printf_packet(index, "150 Opening ASCII mode data connection for list\r\n");
+			if (self->state == STATE_LIST_START) {
 
-					self->state = STATE_LIST_START;
+				command_buffer[0] = '$';
+				command_buffer[1] = 0;
+				command_length = 1;
+				file_open (FTP_SA);
 
-				} else if ((!strncmp(cmd_buf, "MKD", 3)) || (!strncmp(cmd_buf, "CWD", 3)) || (!strncmp(cmd_buf, "RMD", 3)) ) {
-
-					command_length = 2;
-					command_buffer[0] = cmd_buf[0];
-					command_buffer[1] = 'D';
-					
-					for (int a = TCP_DATA_START_VAR + 4; a<(TCP_DATA_END_VAR+1); a++)
-					{
-						unsigned char receive_char;
-						receive_char = eth_buffer[a];
-
-						command_buffer[command_length++] = receive_char;
-						if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
-							break;
-						}
-					}	
-
-					parse_doscommand();
-					free_multiple_buffers(FMB_USER_CLEAN);
-
-					printf_packet(index, "257 %s directory operation done.\r\n", command_buffer);
-
-				} else if (!strncmp(cmd_buf, "DELE", 4)) {
-
-					command_length = 2;
-					command_buffer[0] = 's';
-					command_buffer[1] = ':';
-					
-					for (int a = TCP_DATA_START_VAR + 5; a<(TCP_DATA_END_VAR+1); a++)
-					{
-						unsigned char receive_char;
-						receive_char = eth_buffer[a];
-
-						command_buffer[command_length++] = receive_char;
-						if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
-							break;
-						}
-					}	
-
-					command_buffer[command_length] = 0;
-					asc2pet(command_buffer);
-
-					parse_doscommand();
-					free_multiple_buffers(FMB_USER_CLEAN);
-
-					printf_packet(index, "250 %s file deleted.\r\n", command_buffer);
-
-				} else if (!strncmp(cmd_buf, "STOR", 4)) {
-
-					command_length = 0;
-					
-					for (int a = TCP_DATA_START_VAR + 5; a<(TCP_DATA_END_VAR+1); a++)
-					{
-						unsigned char receive_char;
-						receive_char = eth_buffer[a];
-
-						if (receive_char == 32 || receive_char == 10 || receive_char == 13 || receive_char == 0) {
-							break;
-						}
-						command_buffer[command_length++] = receive_char;
-					}	
-					command_buffer[command_length++] = ',';
-					command_buffer[command_length++] = 'p';
-					command_buffer[command_length++] = ',';
-					command_buffer[command_length++] = 'w';
-
-					command_buffer[command_length] = 0;
-					asc2pet(command_buffer);
-
-					for (uint8_t i = 0; i<command_length; i++)
-						DEBUG_PUTC (command_buffer[i]);
-					DEBUG_PUTCRLF();
-					DEBUG_FLUSH();
-
-					file_open(FTP_SA);
-
-					self->state = STATE_STOR;
-					printf_packet(index, "150 READY.\r\n");
-
-				} else {
-					printf("   %s UNK", cmd_buf);
-					printf_packet(index, "502 command not implemented.\r\n");
+				// skip first "line"
+				{
+					buffer_t *buf;
+					buf = find_buffer(FTP_SA);
+					buf->refill(buf);
 				}
-				break;
-			default:
-				printf("   ERROR - unimplemented state %d", self->state);
-				printf_packet(index, "   >421 internal error.\r\n");
-				tcp_entry[index].app_status = 0xFFFE;
-				tcp_Port_close(index);
 
-		}
-	} else if ((tcp_entry[index].app_status > 1) && (self->state == STATE_LIST_START)) {
+				dir_send_packet(self->data_idx);
+			
+			} else if (self->state == STATE_RETR_START) {
 
-		command_buffer[0] = '$';
-		command_buffer[1] = 0;
-		command_length = 1;
-		file_open (FTP_SA);
+				file_open (FTP_SA);
 
-		// skip first "line"
-		{
-			buffer_t *buf;
-			buf = find_buffer(FTP_SA);
-			buf->refill(buf);
-		}
+				retr_send_packet(self->data_idx);
+				if (!retr_send_packet(self->data_idx)) {
 		
+					buffer_t *buf = find_buffer(FTP_SA);
+					buf->cleanup(buf);
+					free_buffer(buf);
 
-		dir_send_packet(self->data_idx);
+					create_new_tcp_packet(0,self->data_idx);
+					self->state = STATE_RETR_FIN;
+				}
+			}
+		}
 	}
 
 
