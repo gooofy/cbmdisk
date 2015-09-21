@@ -259,11 +259,11 @@ static uint8_t retr_send_packet (uint8_t idx) {
 	create_new_tcp_packet(n, idx);
 	tcp_entry[idx].time = TCP_TIME_OFF;
 
-	if (buf->sendeoi) {
-		return 0;
-	}
+	//if (buf->sendeoi) {
+	//	return 0;
+	//}
 
-	if (buf->sendeoi && FTP_SA != 15 && !buf->recordlen &&
+	if (buf->sendeoi && !buf->recordlen &&
 			buf->refill != directbuffer_refill) {
 		buf->read = 0;
 		return 0;
@@ -366,11 +366,11 @@ static void ftp_data (unsigned char index)
 
 	if (tcp_entry[index].app_status < 0xFFFE)
 	{
-
 		tcp_entry[index].app_status = 1; 
 		tcp_entry[index].status = ACK_FLAG;
+		tcp_entry[index].time   = TCP_TIME_OFF;
 
-	  switch (self->state) {
+		switch (self->state) {
 			case STATE_LIST_START:
 				if (!dir_send_packet(index)) {
 		
@@ -434,8 +434,6 @@ static void ftp_data (unsigned char index)
 
 		return;
 	}	
-
-	return;
 }
 
 static void ftp_ctrl (unsigned char index)
@@ -655,7 +653,6 @@ static void ftp_ctrl (unsigned char index)
 
 				file_open (FTP_SA);
 
-				retr_send_packet(self->data_idx);
 				if (!retr_send_packet(self->data_idx)) {
 		
 					buffer_t *buf = find_buffer(FTP_SA);
