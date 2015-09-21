@@ -92,7 +92,10 @@
 #define STATE_START	     	 1
 #define STATE_LIST_START   2
 #define STATE_LIST_FIN     4
+
 #define STATE_STOR        10
+#define STATE_STOR_FIN    11
+#define STATE_STOR_COMP   12
 
 #define STATE_RETR_START  20
 #define STATE_RETR_FIN    21
@@ -241,10 +244,17 @@ static uint8_t retr_send_packet (uint8_t idx) {
 		return 0;
 	} 
 
+	DEBUG_PUTS_P("RETR DATA DUMP:\r\n");
+	DEBUG_FLUSH();
 	while (buf->position < buf->lastused) {
 		char pc = buf->data[buf->position++];
 		eth_buffer[TCP_DATA_START + (n++)] = pc;
+		DEBUG_PUTC(pc);
+		if ( (buf->position % 16) == 0)
+			DEBUG_FLUSH();
 	}
+	DEBUG_PUTS_P("\r\nRETR DATA DUMP ENDS\r\n");
+	DEBUG_FLUSH();
 
 	create_new_tcp_packet(n, idx);
 	tcp_entry[idx].time = TCP_TIME_OFF;
@@ -276,7 +286,9 @@ static uint8_t stor_byte (uint8_t c) {
 
 	// Flush buffer if full
 	if (buf->mustflush) {
+	  DEBUG_PUTS_P("MUSTFLUSH\r\n");
 		if (buf->refill(buf)) {
+			DEBUG_PUTS_P("REFILL ABORT\r\n");
 			return 0;
 		}
 		// Search the buffer again,
@@ -292,6 +304,20 @@ static uint8_t stor_byte (uint8_t c) {
 
 	// Mark buffer for flushing if position wrapped
 	if (buf->position == 0) buf->mustflush = 1;
+
+}
+
+static void stor_fin (void) {
+	buffer_t *buf;
+
+	buf = find_buffer(FTP_SA);
+
+	if (!buf) {
+		return 0;
+	} 
+
+	buf->cleanup(buf);
+	free_buffer(buf);
 
 }
 
@@ -327,8 +353,12 @@ static void ftp_data (unsigned char index)
 	  DEBUG_PRINTF("   DATA FIN\n\r");
 
 		if (self->state == STATE_STOR) {
+			self->state = STATE_STOR_COMP;
+			stor_fin();
+		} else if (self->state == STATE_STOR_FIN) {
 			printf_packet (ctrl_index, "226 Transfer complete.\r\n");
 			self->state = STATE_START;
+			stor_fin();
 		}
 
 		return;
@@ -361,11 +391,22 @@ static void ftp_data (unsigned char index)
 				break;
 
 			case STATE_STOR:
+				//DEBUG_PUTS_P("STOR DATA DUMP:\r\n");
+				//DEBUG_FLUSH();
 				for (int a = TCP_DATA_START_VAR; a<(TCP_DATA_END_VAR+1); a++)
 				{
 					uint8_t receive_char = eth_buffer[a];
 					stor_byte (receive_char);
+					//DEBUG_PUTC(receive_char);
+					//DEBUG_PUTC('[');
+					//DEBUG_PUTHEX(receive_char);
+					//DEBUG_PUTC(']');
+					//if ( (a % 16) == 0)
+					//	DEBUG_FLUSH();
 				}	
+				//DEBUG_PUTS_P("\r\nSTOR DATA DUMP ENDS\r\n");
+				//DEBUG_FLUSH();
+				
 				create_new_tcp_packet(0,index);
 				break;
 
@@ -624,6 +665,11 @@ static void ftp_ctrl (unsigned char index)
 					create_new_tcp_packet(0,self->data_idx);
 					self->state = STATE_RETR_FIN;
 				}
+			} else if (self->state == STATE_STOR) {
+				self->state = STATE_STOR_FIN;
+			} else if (self->state == STATE_STOR_COMP) {
+				printf_packet (index, "226 Transfer complete.\r\n");
+				self->state = STATE_START;
 			}
 		}
 	}
