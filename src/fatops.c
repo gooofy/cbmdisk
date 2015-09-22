@@ -363,8 +363,6 @@ static uint8_t fat_file_read(buffer_t *buf) {
   FRESULT res;
   UINT bytesread;
 
-  uart_putc('#');
-
   buf->fptr = buf->pvt.fat.fh.fptr - buf->pvt.fat.headersize;
 
   res = f_read(&buf->pvt.fat.fh, buf->data+2, (buf->recordlen ? buf->recordlen : 254), &bytesread);
@@ -407,8 +405,6 @@ static uint8_t write_data(buffer_t *buf) {
   FRESULT res;
   UINT byteswritten;
 
-  uart_putc('/');
-
   if(!buf->mustflush)
     buf->lastused = buf->position - 1;
 
@@ -420,7 +416,6 @@ static uint8_t write_data(buffer_t *buf) {
 
   res = f_write(&buf->pvt.fat.fh, buf->data+2, buf->lastused-1, &byteswritten);
   if (res != FR_OK) {
-    uart_putc('r');
     parse_error(res,1);
     f_close(&buf->pvt.fat.fh);
     free_buffer(buf);
@@ -428,7 +423,6 @@ static uint8_t write_data(buffer_t *buf) {
   }
 
   if (byteswritten != buf->lastused-1U) {
-    uart_putc('l');
     set_error(ERROR_DISK_FULL);
     f_close(&buf->pvt.fat.fh);
     free_buffer(buf);
@@ -498,7 +492,6 @@ static uint8_t fat_file_write(buffer_t *buf) {
     }
     res = f_lseek(&buf->pvt.fat.fh, buf->pvt.fat.fh.fsize);
     if (res != FR_OK) {
-      uart_putc('r');
       parse_error(res,1);
       f_close(&buf->pvt.fat.fh);
       free_buffer(buf);
