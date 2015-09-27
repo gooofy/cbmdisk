@@ -102,6 +102,28 @@
 #include "progmem.h"
 #include "uart.h"
 
+
+#define DEBUG_FF
+
+
+#ifdef DEBUG_FF
+# define DEBUG_PUTS_P(x) uart_puts_P(PSTR(x))
+# define DEBUG_PUTS(x) uart_puts(x)
+# define DEBUG_PUTHEX(x) uart_puthex(x)
+# define DEBUG_PUTC(x)   uart_putc(x)
+# define DEBUG_FLUSH()   uart_flush()
+# define DEBUG_PUTCRLF() uart_putcrlf()
+# define DEBUG_PRINTF(...) printf(__VA_ARGS__)
+#else
+# define DEBUG_PUTS_P(x) do {} while (0)
+# define DEBUG_PUTS(x) do {} while (0)
+# define DEBUG_PUTHEX(x) do {} while (0)
+# define DEBUG_PUTC(x) do {} while (0)
+# define DEBUG_FLUSH() do {} while (0)
+# define DEBUG_PUTCRLF() do {} while (0)
+# define DEBUG_PRINTF(...) while(0)
+#endif
+
 /*--------------------------------------------------------------------------
 
    Module Private Functions
@@ -549,6 +571,7 @@ UCHAR make_dirfile (     /* 1: error - detected an invalid format, '\0'or'/': ne
   n = 0; t = 8;
   for (;;) {
     c = *(*path)++;
+
     if (c == '\0' || c == '/') {           /* Reached to end of str or directory separator */
       if (n == 0) break;
       dirname[11] = _USE_NTFLAG ? (a & b) : 0;
@@ -1416,6 +1439,7 @@ FRESULT f_mount (
   FATFS *fs   /* Pointer to new file system object (NULL for unmount)*/
 )
 {
+
 #if _USE_DRIVE_PREFIX != 0
   if (drv >= _LOGICAL_DRIVES) return FR_INVALID_DRIVE;
 
@@ -1462,6 +1486,9 @@ FRESULT f_open (
   const UCHAR* spath;
 #endif
 
+	DEBUG_PRINTF("FF f_open path=%s\r\n", path);
+	DEBUG_PRINTF("FF f_open mode=%d\r\n", mode);
+	DEBUG_FLUSH();
 
 #if _USE_FS_BUF == 0
   FPBUF.dirty=FALSE;
@@ -1598,6 +1625,8 @@ FRESULT f_read (
   BYTE *rbuff = buff;
   FATFS *fs = fp->fs;
 
+	DEBUG_PRINTF("FF f_read btr=%d\r\n", btr);
+	DEBUG_FLUSH();
 
   *br = 0;
   res = validate(fs /*, fp->id*/);                   /* Check validity of the object */
@@ -1672,6 +1701,8 @@ FRESULT f_write (
   const BYTE *wbuff = buff;
   FATFS *fs = fp->fs;
 
+	DEBUG_PRINTF("FF f_write btw=%d\r\n", btw);
+	DEBUG_FLUSH();
 
   *bw = 0;
   res = validate(fs /*, fp->id*/);                     /* Check validity of the object */
@@ -1751,6 +1782,8 @@ FRESULT f_sync (
   BYTE *dir;
   FATFS *fs = fp->fs;
 
+	DEBUG_PRINTF("FF f_sync\r\n");
+	DEBUG_FLUSH();
 
   res = validate(fs /*, fp->id*/);       /* Check validity of the object */
   if (res == FR_OK) {
@@ -1789,6 +1822,8 @@ FRESULT f_close (
 {
   FRESULT res;
 
+	DEBUG_PRINTF("FF f_close\r\n");
+	DEBUG_FLUSH();
 
 #if !_FS_READONLY
   res = f_sync(fp);
@@ -2396,7 +2431,6 @@ FRESULT f_mkdir (
   DIR fileobj;
   const UCHAR* spath;
 #endif
-
 
   res = auto_mount(&path, &fs, 1);
   if (res != FR_OK) return res;
