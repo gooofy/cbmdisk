@@ -726,389 +726,389 @@ static inline bool save_next_byte (uint8_t cur_sa, uint8_t c) {
 
 void ieee_mainloop_fsm(void) {
 
-  uint8_t cmd=0;        // Received IEEE-488 command byte
+    uint8_t cmd=0;        // Received IEEE-488 command byte
 
-  uint8_t device_state = DEVICE_STATE_IDLE;
+    uint8_t device_state = DEVICE_STATE_IDLE;
 
-	bool open_active     = 0;
-	bool save_active     = 0;
-  uint8_t cur_sa       = 0;
-  buffer_t *buf        = NULL;
-  bool do_tlk          = 0;
-  bool last_byte       = 0;
-  bool byte_pending    = 0;
+    bool open_active     = 0;
+    bool save_active     = 0;
+    uint8_t cur_sa       = 0;
+    buffer_t *buf        = NULL;
+    bool do_tlk          = 0;
+    bool last_byte       = 0;
+    bool byte_pending    = 0;
 
-  // network
-	unsigned long time_update = 0;
-	unsigned char reset_counter = 0;
+    // network
+    unsigned long time_update = 0;
+    unsigned char reset_counter = 0;
 
-  ieee488_InitIFC();
+    ieee488_InitIFC();
 
-  goto_state (STATE_IDLE);
+    goto_state (STATE_IDLE);
 
-  for (;;) {
+    for (;;) {
 
 #if 0
-		if (fsm_state != STATE_IDLE) {
-			if (timeout > TIMEOUT) {
-				DEBUG_PUTHEX(fsm_state);
-				DEBUG_PUTS_P((PSTR("TOUT\r\n"));
-				goto_state(STATE_IDLE);
-				continue;
-			} else {
-				timeout++;
-			}
-		}
+        if (fsm_state != STATE_IDLE) {
+            if (timeout > TIMEOUT) {
+                DEBUG_PUTHEX(fsm_state);
+                DEBUG_PUTS_P((PSTR("TOUT\r\n"));
+                        goto_state(STATE_IDLE);
+                        continue;
+                        } else {
+                        timeout++;
+                        }
+                        }
 #endif
 
-    // FIXME: implement card change handler
-    // handle_card_changes();
+                        // FIXME: implement card change handler
+                        // handle_card_changes();
 
-    switch (fsm_state) {
-      case STATE_IDLE:
-        if (!ieee488_ATN())
-          goto_state (STATE_LSN1);
-        break;
+                        switch (fsm_state) {
+                        case STATE_IDLE:
+                        if (!ieee488_ATN())
+                        goto_state (STATE_LSN1);
+                        break;
 
-      case STATE_LSN1:
-        if (!ieee488_IFC())
-          goto_state (STATE_IDLE);
-        else if (!ieee488_DAV())
-          goto_state (STATE_LSN2);
-        break;
-  
-      case STATE_LSN2:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
-        } else {
+                        case STATE_LSN1:
+                        if (!ieee488_IFC())
+                        goto_state (STATE_IDLE);
+                        else if (!ieee488_DAV())
+                            goto_state (STATE_LSN2);
+                        break;
 
-          cmd = ieee488_Data();
-					eoi = ieee488_EOI();
+                        case STATE_LSN2:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
+                        } else {
 
-          goto_state (STATE_LSN3);
-        }
-        break;
-  
-      case STATE_LSN3:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
- 
-		    } else if (ieee488_DAV()) {
+                            cmd = ieee488_Data();
+                            eoi = ieee488_EOI();
 
-          goto_state (STATE_LSN4);
-        }
-        break;
-  
-      case STATE_LSN4:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
-        } else {
+                            goto_state (STATE_LSN3);
+                        }
+                        break;
 
-					// PET will wait for us while we have NRFD==0 so 
-					// we have time to process commands here
+                        case STATE_LSN3:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 
-          DEBUG_PUTC('['); DEBUG_PUTHEX(cmd); DEBUG_PUTS_P("]\r\n");
+                        } else if (ieee488_DAV()) {
 
-					if (open_active) {
-						// Receive commands and filenames
-						if (command_length < CONFIG_COMMAND_BUFFER_SIZE)
-							command_buffer[command_length++] = (char) cmd;
+                            goto_state (STATE_LSN4);
+                        }
+                        break;
 
-						if (!eoi) {
+                        case STATE_LSN4:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
+                        } else {
 
-							DEBUG_PUTS_P("CBUF:");
+                            // PET will wait for us while we have NRFD==0 so 
+                            // we have time to process commands here
 
-							for (int8_t i = 0; i<command_length; i++)
-								DEBUG_PUTC(command_buffer[i]);
+                            DEBUG_PUTC('['); DEBUG_PUTHEX(cmd); DEBUG_PUTS_P("]\r\n");
 
-							DEBUG_PUTS_P("\r\n");
+                            if (open_active) {
+                                // Receive commands and filenames
+                                if (command_length < CONFIG_COMMAND_BUFFER_SIZE)
+                                    command_buffer[command_length++] = (char) cmd;
 
-							if (cur_sa == 15) {
-								DEBUG_PUTS_P("DOSCMD\r\n");
-								parse_doscommand();
-							} else {
-								DEBUG_PUTS_P("FOPN\r\n");
-								datacrc = 0xffff;                   // filename in command buffer
-								file_open(cur_sa);
-							}
-							open_active = 0;
-						}
-					} else if (save_active) {
+                                if (!eoi) {
 
-						if (!save_next_byte(cur_sa, cmd)) {
-							save_active = 0;
-							device_state = DEVICE_STATE_IDLE;
-						}
-						if (!eoi) {
-							save_active = 0;
-						}
+                                    DEBUG_PUTS_P("CBUF:");
 
-					} else {
+                                    for (int8_t i = 0; i<command_length; i++)
+                                        DEBUG_PUTC(command_buffer[i]);
 
-						uint8_t cmd3   = cmd & 0b11100000;
-						uint8_t cmd4   = cmd & 0b11110000;
-						uint8_t Device = cmd & 0b00011111; // device number from cmd byte
-						uint8_t sa     = cmd & 0b00001111; // secondary address from cmd byte
+                                    DEBUG_PUTS_P("\r\n");
 
-						if (cmd == IEEE_UNLISTEN) {           // UNLISTEN
-							DEBUG_PUTS_P("ULSN\r\n");
-							device_state = DEVICE_STATE_IDLE;
-						 
-						} else if (cmd == IEEE_UNTALK) {      // UNTALK
-							DEBUG_PUTS_P("UTLK\r\n");
-							do_tlk = 0;
-							//device_state = DEVICE_STATE_IDLE;
-						  device_state = DEVICE_STATE_LISTENER;
+                                    if (cur_sa == 15) {
+                                        DEBUG_PUTS_P("DOSCMD\r\n");
+                                        parse_doscommand();
+                                    } else {
+                                        DEBUG_PUTS_P("FOPN\r\n");
+                                        datacrc = 0xffff;                   // filename in command buffer
+                                        file_open(cur_sa);
+                                    }
+                                    open_active = 0;
+                                }
+                            } else if (save_active) {
 
-						} else if (cmd3 == IEEE_LISTEN) {     // LISTEN
-							DEBUG_PUTS_P("LSN\r\n");
-							if (Device == device_address) {
-								device_state = DEVICE_STATE_LISTENER;
-							} else {
-							  device_state = DEVICE_STATE_IDLE;
-							}
+                                if (!save_next_byte(cur_sa, cmd)) {
+                                    save_active = 0;
+                                    device_state = DEVICE_STATE_IDLE;
+                                }
+                                if (!eoi) {
+                                    save_active = 0;
+                                }
 
-						} else if (cmd3 == IEEE_TALK) {       // TALK
-							DEBUG_PUTS_P("TLK\r\n");
-							if (Device == device_address) {
-								device_state = DEVICE_STATE_TALKER;
-							} else {
-							  device_state = DEVICE_STATE_IDLE;
-							}
+                            } else {
 
-						} else if (cmd4 == IEEE_SECONDARY) {  // DATA
-							DEBUG_PUTS_P("DTA\r\n");
-							cur_sa = sa;
-							if (device_state == DEVICE_STATE_TALKER) {
+                                uint8_t cmd3   = cmd & 0b11100000;
+                                uint8_t cmd4   = cmd & 0b11110000;
+                                uint8_t Device = cmd & 0b00011111; // device number from cmd byte
+                                uint8_t sa     = cmd & 0b00001111; // secondary address from cmd byte
 
-								if (!byte_pending) {
-									if (!fetch_next_byte (cur_sa)) {
-										DEBUG_PUTHEX(data_out); DEBUG_PUTHEX(eoi); DEBUG_PUTS_P("TLK1 ERR\r\n"); // FIXME: debug
-									}
-									byte_pending = 1;
-								}
+                                if (cmd == IEEE_UNLISTEN) {           // UNLISTEN
+                                    DEBUG_PUTS_P("ULSN\r\n");
+                                    device_state = DEVICE_STATE_IDLE;
 
-								do_tlk    = 1;
-								last_byte = !eoi;
+                                } else if (cmd == IEEE_UNTALK) {      // UNTALK
+                                    DEBUG_PUTS_P("UTLK\r\n");
+                                    do_tlk = 0;
+                                    //device_state = DEVICE_STATE_IDLE;
+                                    device_state = DEVICE_STATE_LISTENER;
 
-							} else if (device_state == DEVICE_STATE_LISTENER) {
-								save_active = 1;
-							}
+                                } else if (cmd3 == IEEE_LISTEN) {     // LISTEN
+                                    DEBUG_PUTS_P("LSN\r\n");
+                                    if (Device == device_address) {
+                                        device_state = DEVICE_STATE_LISTENER;
+                                    } else {
+                                        device_state = DEVICE_STATE_IDLE;
+                                    }
 
-						} else if (cmd4 == IEEE_CLOSE) {      // CLOSE
-							if (device_state != DEVICE_STATE_IDLE) {
-								DEBUG_PUTS_P("CLO\r\n");
-								byte_pending = 0;
-								if (sa == 15) {
-									free_multiple_buffers(FMB_USER_CLEAN);
-								} else {
-									buf = find_buffer(sa);
-									if (buf != NULL) {
-										buf->cleanup(buf);
-										free_buffer(buf);
-									}
-								}
-							}
+                                } else if (cmd3 == IEEE_TALK) {       // TALK
+                                    DEBUG_PUTS_P("TLK\r\n");
+                                    if (Device == device_address) {
+                                        device_state = DEVICE_STATE_TALKER;
+                                    } else {
+                                        device_state = DEVICE_STATE_IDLE;
+                                    }
 
-						} else if (cmd4 == IEEE_OPEN) {       // OPEN
-							if (device_state != DEVICE_STATE_IDLE) {
-								DEBUG_PUTHEX(sa); DEBUG_PUTS_P("OPN\r\n");
+                                } else if (cmd4 == IEEE_SECONDARY) {  // DATA
+                                    DEBUG_PUTS_P("DTA\r\n");
+                                    cur_sa = sa;
+                                    if (device_state == DEVICE_STATE_TALKER) {
 
-								open_active = 1;
-								command_length = 0;
-								cur_sa = sa;
-							}
+                                        if (!byte_pending) {
+                                            if (!fetch_next_byte (cur_sa)) {
+                                                DEBUG_PUTHEX(data_out); DEBUG_PUTHEX(eoi); DEBUG_PUTS_P("TLK1 ERR\r\n"); // FIXME: debug
+                                            }
+                                            byte_pending = 1;
+                                        }
 
-						} else {
-							DEBUG_PUTS_P("UKN\r\n");
-						}
-					}
-					//DEBUG_FLUSH();
-					//_delay_ms(1000);
-  
-					if (do_tlk) {
-						goto_state (STATE_TLK1);
-					} else if (device_state != DEVICE_STATE_IDLE) {
-						goto_state(STATE_LSN1);
-					} else {
-						goto_state (STATE_IDLE);
-					}
-				}
-        break;
+                                        do_tlk    = 1;
+                                        last_byte = !eoi;
 
-      case STATE_TLK1:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
+                                    } else if (device_state == DEVICE_STATE_LISTENER) {
+                                        save_active = 1;
+                                    }
+
+                                } else if (cmd4 == IEEE_CLOSE) {      // CLOSE
+                                    if (device_state != DEVICE_STATE_IDLE) {
+                                        DEBUG_PUTS_P("CLO\r\n");
+                                        byte_pending = 0;
+                                        if (sa == 15) {
+                                            free_multiple_buffers(FMB_USER_CLEAN);
+                                        } else {
+                                            buf = find_buffer(sa);
+                                            if (buf != NULL) {
+                                                buf->cleanup(buf);
+                                                free_buffer(buf);
+                                            }
+                                        }
+                                    }
+
+                                } else if (cmd4 == IEEE_OPEN) {       // OPEN
+                                    if (device_state != DEVICE_STATE_IDLE) {
+                                        DEBUG_PUTHEX(sa); DEBUG_PUTS_P("OPN\r\n");
+
+                                        open_active = 1;
+                                        command_length = 0;
+                                        cur_sa = sa;
+                                    }
+
+                                } else {
+                                    DEBUG_PUTS_P("UKN\r\n");
+                                }
+                            }
+                            //DEBUG_FLUSH();
+                            //_delay_ms(1000);
+
+                            if (do_tlk) {
+                                goto_state (STATE_TLK1);
+                            } else if (device_state != DEVICE_STATE_IDLE) {
+                                goto_state(STATE_LSN1);
+                            } else {
+                                goto_state (STATE_IDLE);
+                            }
+                        }
+                        break;
+
+                        case STATE_TLK1:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 #if 0
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK1ATN\r\n"); // FIXME: debug
-          goto_state (STATE_TLK8);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK1ATN\r\n"); // FIXME: debug
+                            goto_state (STATE_TLK8);
 #endif
-        } else if (!ieee488_NDAC()) {
-          goto_state (STATE_TLK2);
-				}
-        break;
-  
-      case STATE_TLK2:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
+                        } else if (!ieee488_NDAC()) {
+                            goto_state (STATE_TLK2);
+                        }
+                        break;
+
+                        case STATE_TLK2:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 #if 0
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK2ATN\r\n"); 
-          goto_state (STATE_TLK8);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK2ATN\r\n"); 
+                            goto_state (STATE_TLK8);
 #endif
 #if 1
-        } else if (ieee488_NDAC()) {
-					DEBUG_PUTS_P("TLK2NDAC\r\n"); 
-          goto_state (STATE_TLK8);
+                        } else if (ieee488_NDAC()) {
+                            DEBUG_PUTS_P("TLK2NDAC\r\n"); 
+                            goto_state (STATE_TLK8);
 #endif
-        } else if (ieee488_NRFD()) {
-          goto_state (STATE_TLK3);
-				}
-        break;
-  
-      case STATE_TLK3:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK3ATN\r\n"); 
-          goto_state (STATE_TLK8);
+                        } else if (ieee488_NRFD()) {
+                            goto_state (STATE_TLK3);
+                        }
+                        break;
+
+                        case STATE_TLK3:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK3ATN\r\n"); 
+                            goto_state (STATE_TLK8);
 #if 1
-        } else if (ieee488_NDAC()) {
-					DEBUG_PUTS_P("TLK3NDAC\r\n"); // FIXME: debug
-          goto_state (STATE_TLK8);
-        } else if (!ieee488_NRFD()) {
-					DEBUG_PUTS_P("TLK3NRFD\r\n"); // FIXME: debug
-          goto_state (STATE_TLK8);
+                        } else if (ieee488_NDAC()) {
+                            DEBUG_PUTS_P("TLK3NDAC\r\n"); // FIXME: debug
+                            goto_state (STATE_TLK8);
+                        } else if (!ieee488_NRFD()) {
+                            DEBUG_PUTS_P("TLK3NRFD\r\n"); // FIXME: debug
+                            goto_state (STATE_TLK8);
 #endif
-        } else {
-          goto_state (STATE_TLK4);
-        }
-        break;
-  
-      case STATE_TLK4:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK4ATN\r\n"); 
-          goto_state (STATE_TLK8);
- 
+                        } else {
+                            goto_state (STATE_TLK4);
+                        }
+                        break;
+
+                        case STATE_TLK4:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK4ATN\r\n"); 
+                            goto_state (STATE_TLK8);
+
 #if 1
-        } else if (ieee488_NDAC()) {
-					DEBUG_PUTS_P("TLK4NDAC\r\n"); 
-				  goto_state (STATE_TLK8);
+                        } else if (ieee488_NDAC()) {
+                            DEBUG_PUTS_P("TLK4NDAC\r\n"); 
+                            goto_state (STATE_TLK8);
 #endif
-					
-        } else if (!ieee488_NRFD()) {
 
-					if (last_byte) {
-						DEBUG_PUTS_P("TLK4 -> TLK5 finish\r\n"); 
-						do_tlk = 0;
-					} else {
+                        } else if (!ieee488_NRFD()) {
 
-						// PET will wait for us here so we have time to fetch our next data byte
-						
-						if (!fetch_next_byte (cur_sa)) {
-							DEBUG_PUTS_P("TLK4 -> TLK5 ERR\r\n"); 
-						}
+                            if (last_byte) {
+                                DEBUG_PUTS_P("TLK4 -> TLK5 finish\r\n"); 
+                                do_tlk = 0;
+                            } else {
 
-						last_byte = !eoi;
+                                // PET will wait for us here so we have time to fetch our next data byte
 
-						//_delay_ms(1); // FIXME: debug
-						DEBUG_FLUSH();
-					}
-				  goto_state (STATE_TLK5);
-        }
-        break;
-  
-      case STATE_TLK5:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
+                                if (!fetch_next_byte (cur_sa)) {
+                                    DEBUG_PUTS_P("TLK4 -> TLK5 ERR\r\n"); 
+                                }
+
+                                last_byte = !eoi;
+
+                                //_delay_ms(1); // FIXME: debug
+                                DEBUG_FLUSH();
+                            }
+                            goto_state (STATE_TLK5);
+                        }
+                        break;
+
+                        case STATE_TLK5:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 #if 1
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK5ATN\r\n"); 
-          goto_state (STATE_TLK8);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK5ATN\r\n"); 
+                            goto_state (STATE_TLK8);
 #endif
-        } else if (ieee488_NDAC()) {
-          goto_state (STATE_TLK6);
-				}
-        break;
+                        } else if (ieee488_NDAC()) {
+                            goto_state (STATE_TLK6);
+                        }
+                        break;
 
-      case STATE_TLK6:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
+                        case STATE_TLK6:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 #if 1
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK6ATN\r\n"); 
-          goto_state (STATE_TLK8);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK6ATN\r\n"); 
+                            goto_state (STATE_TLK8);
 #endif
-        } else if (!ieee488_NDAC()) {
-          goto_state (STATE_TLK7);
-				}
-        break;
+                        } else if (!ieee488_NDAC()) {
+                            goto_state (STATE_TLK7);
+                        }
+                        break;
 
-      case STATE_TLK7:
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
-				} else if (!ieee488_ATN()) {
-					DEBUG_PUTS_P("TLK7ATN\r\n");
-          goto_state (STATE_TLK8);
+                        case STATE_TLK7:
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
+                        } else if (!ieee488_ATN()) {
+                            DEBUG_PUTS_P("TLK7ATN\r\n");
+                            goto_state (STATE_TLK8);
 
-        } else {
+                        } else {
 
-					if (do_tlk) { 
-						goto_state (STATE_TLK2);
-					} else {
-            goto_state (STATE_TLK8);
-					}
+                            if (do_tlk) { 
+                                goto_state (STATE_TLK2);
+                            } else {
+                                goto_state (STATE_TLK8);
+                            }
 
-				}
-        break;
+                        }
+                        break;
 
-      case STATE_TLK8:
-				do_tlk = 0;
-        if (!ieee488_IFC()) {
-          goto_state (STATE_IDLE);
+                        case STATE_TLK8:
+                        do_tlk = 0;
+                        if (!ieee488_IFC()) {
+                            goto_state (STATE_IDLE);
 
-        } else {
-          goto_state (STATE_LSN1);
-				}
-        break;
+                        } else {
+                            goto_state (STATE_LSN1);
+                        }
+                        break;
+                        }
+
+#ifdef ENABLE_NETWORK
+                        /*
+                         * network code
+                         */
+
+                        eth_get_data();
+
+                        if(ping.result)
+                        {
+                            printf("Get PONG: %i.%i.%i.%i\r\n",ping.ip1[0],ping.ip1[1],ping.ip1[2],ping.ip1[3]); 
+                            ping.result = 0;
+                        }
+
+                        // called once per second
+                        if (eth_time != time_update)
+                        {
+                            time_update = eth_time;
+                            if(eth.no_reset)
+                            {
+                                reset_counter = 0;
+                                eth.no_reset = 0;
+                            }
+                            else
+                            {
+                                if((reset_counter++)>5)
+                                {
+                                    reset_counter = 0;
+                                    enc_init();
+                                }
+                            }
+                        }	
+#endif
     }
-
-#if 1
-		/*
- 		 * network code
-     */
-
-		eth_get_data();
-
-		if(ping.result)
-		{
-			printf("Get PONG: %i.%i.%i.%i\r\n",ping.ip1[0],ping.ip1[1],ping.ip1[2],ping.ip1[3]); 
-			ping.result = 0;
-		}
-
-		// called once per second
-		if (eth_time != time_update)
-		{
-			time_update = eth_time;
-			if(eth.no_reset)
-			{
-				reset_counter = 0;
-				eth.no_reset = 0;
-			}
-			else
-			{
-				if((reset_counter++)>5)
-				{
-					reset_counter = 0;
-					enc_init();
-				}
-			}
-		}	
-#endif
-  }
 }
 
 void bus_mainloop(void) __attribute__ ((weak, alias("ieee_mainloop_fsm")));

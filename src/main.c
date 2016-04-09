@@ -65,52 +65,57 @@
 int main(void)
 {  
 
-  leds_init();
+    leds_init();
 
-  set_busy_led(1);
+    set_busy_led(1);
 
-  uart_init(); 
-	spi_init(SPI_SPEED_SLOW);
-	timer_init();
-  ieee_interface_init();
+    uart_init(); 
+    spi_init(SPI_SPEED_SLOW);
+    timer_init();
+    ieee_interface_init();
 
-	// init network stack and ethernet controller
-	stack_init();
-	enc_init();	
+    // init network stack and ethernet controller
 
-	ftpd_init();
-	
-	// enable interrupts
-	ETH_INT_ENABLE;
-	sei(); 
+#ifdef ENABLE_NETWORK
+    stack_init();
+    enc_init();	
+#endif
 
-	_delay_ms(500);
+    ftpd_init();
 
-	uart_puts_P(PSTR("\n\r" PROJECT " " VERSION "\n\r"));
+    // enable interrupts
+    ETH_INT_ENABLE;
+    sei(); 
 
-	// NODISKEMU buffers / sdcard access
-  buffers_init();
-  bus_init();
-  disk_init(); 
-  read_configuration();
-  
-  filesystem_init(0);
-  //change_init();
-	
-	uart_puts_P(PSTR("\n\rREADY.\n\r"));
+    _delay_ms(500);
 
-  printf("IP   %1i.%1i.%1i.%1i\r\n", myip[0]     , myip[1]     , myip[2]     , myip[3]);
-  printf("MASK %1i.%1i.%1i.%1i\r\n", netmask[0]  , netmask[1]  , netmask[2]  , netmask[3]);
-  printf("GW   %1i.%1i.%1i.%1i\r\n", router_ip[0], router_ip[1], router_ip[2], router_ip[3]);
+    uart_puts_P(PSTR("\n\r" PROJECT " " VERSION "\n\r"));
 
-  set_busy_led(0);
+    // NODISKEMU buffers / sdcard access
+    buffers_init();
+    bus_init();
+    disk_init(); 
+    read_configuration();
 
-	bus_mainloop();
+    filesystem_init(0);
+    //change_init();
 
-	printf("mainloop done ?!\r\n");
+    uart_puts_P(PSTR("\n\rREADY.\n\r"));
 
-	while (1);
+#ifdef ENABLE_NETWORK
+    printf("IP   %1i.%1i.%1i.%1i\r\n", myip[0]     , myip[1]     , myip[2]     , myip[3]);
+    printf("MASK %1i.%1i.%1i.%1i\r\n", netmask[0]  , netmask[1]  , netmask[2]  , netmask[3]);
+    printf("GW   %1i.%1i.%1i.%1i\r\n", router_ip[0], router_ip[1], router_ip[2], router_ip[3]);
+#endif
 
-	return(0);
+    set_busy_led(0);
+
+    bus_mainloop();
+
+    printf("mainloop done ?!\r\n");
+
+    while (1);
+
+    return(0);
 }
 

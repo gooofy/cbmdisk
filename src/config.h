@@ -51,6 +51,8 @@
 #define VERSION "0.1"
 #define LONGVERSION VERSION
 
+#define ENABLE_NETWORK
+
 // convert IP to unsigned long
 #define IP(a,b,c,d) ((unsigned long)(d)<<24)+((unsigned long)(c)<<16)+((unsigned long)(b)<<8)+a
 
