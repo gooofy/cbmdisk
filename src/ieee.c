@@ -578,6 +578,11 @@ static inline void goto_state(uint8_t state) {
             //DEBUG_PUTS_P("IDLE\r\n");
             break;
 
+        case STATE_WAITNATN:
+            ieee488_SetNDAC(0);
+            ieee488_SetNRFD(0);   
+            break;
+
         case STATE_LSN1:
             ieee488_SetNRFD(1);   
             ieee488_SetNDAC(0);
@@ -913,8 +918,20 @@ void ieee_mainloop_fsm(void) {
                     } else if (device_state != DEVICE_STATE_IDLE) {
                         goto_state (STATE_LSN1);
                     } else {
-                        goto_state (STATE_IDLE);
+                        goto_state (STATE_WAITNATN);
                     }
+                }
+                break;
+
+            case STATE_WAITNDAV:
+                if (!ieee488_IFC() || ieee488_DAV()) {
+                    goto_state (STATE_IDLE);
+                }
+                break;
+
+            case STATE_WAITNATN:
+                if (!ieee488_IFC() || !ieee488_ATN()) {
+                    goto_state (STATE_IDLE);
                 }
                 break;
 
