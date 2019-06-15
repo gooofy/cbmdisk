@@ -60,7 +60,7 @@
 #include "fileops.h"
 #include "filesystem.h"
 #include "flags.h"
-#include "iec.h"
+#include "bus.h"
 #include "parser.h"
 #include "time.h"
 #include "uart.h"

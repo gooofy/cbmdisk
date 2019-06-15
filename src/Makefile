@@ -57,9 +57,9 @@ TARGET = main
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = buffers.c  diskio.c  eeprom-conf.c  errormsg.c  ff.c       ftpd.c  ieee.c \
-			main.c     parser.c  spi.c          timer.c  utils.c \
-			d64ops.c   doscmd.c  enc28j60.c     fatops.c    fileops.c  sdcard.c  tcpip.c  uart.c
+SRC = buffers.c  diskio.c  eeprom-conf.c  errormsg.c  ff.c       ieee.c \
+	  main.c     parser.c  spi.c          timer.c     utils.c \
+	  d64ops.c   doscmd.c  fatops.c       fileops.c   sdcard.c   uart.c
 
 # List Assembler source files here.
 # Make them always end in a capital .S.  Files ending in a lowercase .s

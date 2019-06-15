@@ -44,10 +44,7 @@
 
 #include "config.h"
 
-#include "enc28j60.h"
-#include "tcpip.h"
 #include "timer.h"
-#include "ftpd.h"
 #include "uart.h"
 
 #include "spi.h"
@@ -74,17 +71,7 @@ int main(void)
     timer_init();
     ieee_interface_init();
 
-    // init network stack and ethernet controller
-
-#ifdef ENABLE_NETWORK
-    stack_init();
-    enc_init();	
-#endif
-
-    ftpd_init();
-
     // enable interrupts
-    ETH_INT_ENABLE;
     sei(); 
 
     _delay_ms(500);
@@ -101,12 +88,6 @@ int main(void)
     //change_init();
 
     uart_puts_P(PSTR("\n\rREADY.\n\r"));
-
-#ifdef ENABLE_NETWORK
-    printf("IP   %1i.%1i.%1i.%1i\r\n", myip[0]     , myip[1]     , myip[2]     , myip[3]);
-    printf("MASK %1i.%1i.%1i.%1i\r\n", netmask[0]  , netmask[1]  , netmask[2]  , netmask[3]);
-    printf("GW   %1i.%1i.%1i.%1i\r\n", router_ip[0], router_ip[1], router_ip[2], router_ip[3]);
-#endif
 
     set_busy_led(0);
 

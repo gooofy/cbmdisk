@@ -51,22 +51,6 @@
 #define VERSION "0.1"
 #define LONGVERSION VERSION
 
-#define ENABLE_NETWORK
-
-// convert IP to unsigned long
-#define IP(a,b,c,d) ((unsigned long)(d)<<24)+((unsigned long)(c)<<16)+((unsigned long)(b)<<8)+a
-
-#define MYIP      IP(192,168,178,99)
-#define ROUTER_IP	IP(192,168,178,1)
-#define NETMASK		IP(255,255,255,0)
-
-#define MYMAC1	0x00
-#define MYMAC2	0x20
-#define MYMAC3	0x18
-#define MYMAC4	0xB1	
-#define MYMAC5	0x15
-#define MYMAC6	0x6F
-
 // Timertakt intern oder extern
 #define EXTCLOCK 0 //0=Intern 1=Externer Uhrenquarz
 

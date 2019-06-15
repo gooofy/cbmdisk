@@ -46,7 +46,6 @@
 #include <avr/interrupt.h>
 
 #include "timer.h"
-#include "tcpip.h"
 #include "time.h"
 
 volatile unsigned long eth_time;
@@ -55,43 +54,28 @@ volatile tick_t ticks;
 
 void timer_init (void)
 {
-  // NODISKEMU timers
+    // NODISKEMU timers
 
-  /* Count F_CPU/8 in timer 0 */
-  TCCR0B = _BV(CS01);
+    /* Count F_CPU/8 in timer 0 */
+    TCCR0B = _BV(CS01);
 
-  /* Set up a 100Hz interrupt using timer 1 */
-  OCR1A  = F_CPU / 64 / 100 - 1;
-  TCNT1  = 0;
-  TCCR1A = 0;
-  TCCR1B = _BV(WGM12) | _BV(CS10) | _BV(CS11);
-  TIMSK1 |= _BV(OCIE1A);
+    /* Set up a 100Hz interrupt using timer 1 */
+    OCR1A  = F_CPU / 64 / 100 - 1;
+    TCNT1  = 0;
+    TCCR1A = 0;
+    TCCR1B = _BV(WGM12) | _BV(CS10) | _BV(CS11);
+    TIMSK1 |= _BV(OCIE1A);
 
-	// networking timer
-
-	TCCR3B |= (1<<WGM32) | (1<<CS30 | 0<<CS31 | 1<<CS32);
-	TCNT3 = 0;
-	OCR3A = (F_CPU / 1024) - 1;
-	TIMSK3 |= (1 << OCIE3A);
-
-	return;
+    return;
 };
-
-// networking timer interrupt
-ISR (TIMER3_COMPA_vect)
-{
-	//tick 1 second
-	eth_time++;
-	eth.timer = 1;
-}
 
 /* The NODISKEMU main timer interrupt */
 ISR (TIMER1_COMPA_vect) {
 
-  /* Enable interrupts ASAP again, esp. for ATN */
-	sei();
+    /* Enable interrupts ASAP again, esp. for ATN */
+    sei();
 
-  ticks++;
+    ticks++;
 
 }
 
