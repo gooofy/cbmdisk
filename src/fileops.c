@@ -1,6 +1,6 @@
 /*
- * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
- * Copyright (C) 2015 Guenter Bartsch
+ * cbmdisk - simple sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015, 2019 Guenter Bartsch
  * 
  * Most of the code originates from:
  *
@@ -14,9 +14,6 @@
  *
  * Inspired by MMC2IEC by Lars Pontoppidan et al.
  * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
- *
- * Network code is based on ETH_M32_EX 
- * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
  * JiffyDos send based on code by M.Kiesel
  * Fat LFN support and lots of other ideas+code by Jim Brain 
@@ -58,7 +55,7 @@
 #include "wrapops.h"
 #include "fileops.h"
 
-#define DEBUG_FILEOPS
+// #define DEBUG_FILEOPS
 
 #ifdef DEBUG_FILEOPS
 # define DEBUG_PUTS_P(x) uart_puts_P(PSTR(x))

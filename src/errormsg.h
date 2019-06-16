@@ -1,6 +1,6 @@
 /*
- * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
- * Copyright (C) 2015 Guenter Bartsch
+ * cbmdisk - simple sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015, 2019 Guenter Bartsch
  * 
  * Most of the code originates from:
  *
@@ -14,9 +14,6 @@
  *
  * Inspired by MMC2IEC by Lars Pontoppidan et al.
  * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
- *
- * Network code is based on ETH_M32_EX 
- * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
  * JiffyDos send based on code by M.Kiesel
  * Fat LFN support and lots of other ideas+code by Jim Brain 
@@ -35,8 +32,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA *
  *
 
    errormsg.h: Definitions for the error message generator

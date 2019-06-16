@@ -1,6 +1,6 @@
  /*
- * cbmdisk - network enabled, sd card based IEEE-488 CBM floppy emulator 
- * Copyright (C) 2015 Guenter Bartsch
+ * cbmdisk - simple sd card based IEEE-488 CBM floppy emulator 
+ * Copyright (C) 2015, 2019 Guenter Bartsch
  * 
  * Most of the code originates from:
  *
@@ -14,9 +14,6 @@
  *
  * Inspired by MMC2IEC by Lars Pontoppidan et al.
  * FAT filesystem access based on code from ChaN and Jim Brain, see ff.c|h.
- *
- * Network code is based on ETH_M32_EX 
- * Copyright (C) 2007 by Radig Ulrich <mail@ulrichradig.de>
  *
  * JiffyDos send based on code by M.Kiesel
  * Fat LFN support and lots of other ideas+code by Jim Brain 
@@ -42,7 +39,6 @@
  *
  * timer0: FCPU/8 for NODISKEMU
  * timer1: 100 Hz for NODISKEMU
- * timer3:   1 Hz for networking
  *
  */
 
@@ -81,9 +77,6 @@ static inline __attribute__((always_inline)) void start_timeout(uint16_t usecs) 
 static inline uint8_t has_timed_out(void) {
   return TIFR0 & _BV(TOV0);
 }
-
-// network time
-volatile unsigned long eth_time;
 
 /// Global timing variable, 100 ticks per second
 /// Use getticks() !
