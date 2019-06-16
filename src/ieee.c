@@ -513,7 +513,6 @@ void handle_card_changes(void) {
 }
 
 #define STATE_IDLE                     1
-#define STATE_WAITNATN                 2
 
 #define STATE_LSN1                    11
 #define STATE_LSN2                    12
@@ -576,11 +575,6 @@ static inline void goto_state(uint8_t state) {
             ieee488_SetNDAC(1);
             ieee488_DataListen();
             //DEBUG_PUTS_P("IDLE\r\n");
-            break;
-
-        case STATE_WAITNATN:
-            ieee488_SetNRFD(0);   
-            ieee488_SetNDAC(0);
             break;
 
         case STATE_LSN1:
@@ -924,18 +918,14 @@ void ieee_mainloop_fsm(void) {
                     goto_state (STATE_IDLE);
                 } else {
                     if (do_tlk) {
-                        goto_state (STATE_TLK1);
+                        if (ieee488_ATN()) 
+                            goto_state (STATE_TLK1);
                     } else if (device_state != DEVICE_STATE_IDLE) {
                         goto_state (STATE_LSN1);
                     } else {
-                        goto_state (STATE_WAITNATN);
+                        if (ieee488_ATN()) 
+                            goto_state (STATE_IDLE);
                     }
-                }
-                break;
-
-            case STATE_WAITNATN:
-                if (!ieee488_IFC() || ieee488_ATN()) {
-                    goto_state (STATE_IDLE);
                 }
                 break;
 

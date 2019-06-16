@@ -215,7 +215,7 @@ void set_error_ts(uint8_t errornum, uint8_t track, uint8_t sector) {
   uint8_t *msg = error_buffer;
   uint8_t i = 0;
 
-  if (errnum) {
+  if (errornum) {
     DEBUG_PUTHEX(errornum);
     DEBUG_PUTHEX(track);
     DEBUG_PUTHEX(sector);
