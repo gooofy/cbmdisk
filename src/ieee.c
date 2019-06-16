@@ -673,7 +673,7 @@ static inline bool fetch_next_byte (uint8_t cur_sa) {
 
     if (buf->position == buf->lastused) {
         if (buf->sendeoi && cur_sa != 15 && !buf->recordlen &&
-                buf->refill != directbuffer_refill) {
+            buf->refill != directbuffer_refill) {
             buf->read = 0;
             DEBUG_PUTS_P("T8\r\n");
             return 0;
@@ -874,7 +874,7 @@ void ieee_mainloop_fsm(void) {
 
                                 if (!byte_pending) {
                                     if (!fetch_next_byte (cur_sa)) {
-                                        DEBUG_PUTHEX(data_out); DEBUG_PUTHEX(eoi); DEBUG_PUTS_P("TLK1 ERR\r\n"); // FIXME: debug
+                                        DEBUG_PUTHEX(data_out); DEBUG_PUTHEX(eoi); DEBUG_PUTS_P("DTA ERR\r\n"); // FIXME: debug
                                     }
                                     byte_pending = 1;
                                 }
@@ -1016,12 +1016,17 @@ void ieee_mainloop_fsm(void) {
                     if (last_byte) {
                         DEBUG_PUTS_P("TLK4 -> TLK5 finish\r\n"); 
                         do_tlk = 0;
+                        if (cur_sa == 15) {
+                            DEBUG_PUTS_P("TLK4 -> TLK5 autoclose\r\n"); 
+                            byte_pending = 0;
+                            free_multiple_buffers(FMB_USER_CLEAN);
+                        }
                     } else {
 
                         // PET will wait for us here so we have time to fetch our next data byte
 
                         if (!fetch_next_byte (cur_sa)) {
-                            DEBUG_PUTS_P("TLK4 -> TLK5 ERR\r\n"); 
+                            DEBUG_PUTS_P("TLK4 -> TLK5 EOF\r\n"); 
                         }
 
                         last_byte = !eoi;
