@@ -58,6 +58,20 @@
 #include "wrapops.h"
 #include "fileops.h"
 
+#define DEBUG_FILEOPS
+
+#ifdef DEBUG_FILEOPS
+# define DEBUG_PUTS_P(x) uart_puts_P(PSTR(x))
+# define DEBUG_PUTHEX(x) uart_puthex(x)
+# define DEBUG_PUTC(x)   uart_putc(x)
+# define DEBUG_FLUSH()   uart_flush()
+#else
+# define DEBUG_PUTS_P(x) do {} while (0)
+# define DEBUG_PUTHEX(x) do {} while (0)
+# define DEBUG_PUTC(x) do {} while (0)
+# define DEBUG_FLUSH() do {} while (0)
+#endif
+
 /* ------------------------------------------------------------------------- */
 /*  global variables                                                         */
 /* ------------------------------------------------------------------------- */
@@ -926,6 +940,8 @@ void file_open(uint8_t secondary) {
     return;
   }
 
+  DEBUG_PUTS_P("fopn1\r\n");
+
   /* Parse path+partition numbers */
   uint8_t *fname;
   int8_t res;
@@ -940,6 +956,7 @@ void file_open(uint8_t secondary) {
   if (opendir(&matchdh, &path))
     return;
 
+  DEBUG_PUTS_P("fopn2\r\n");
   do {
     res = next_match(&matchdh, fname, NULL, NULL, FLAG_HIDDEN, &dent);
     if (res > 0)
@@ -960,6 +977,8 @@ void file_open(uint8_t secondary) {
     set_error(ERROR_SYNTAX_UNABLE);
     return;
   }
+
+  DEBUG_PUTS_P("fopn3\r\n");
 
   /* If match found is a REL... */
   if(!res && (dent.typeflags & TYPE_MASK) == TYPE_REL) {
@@ -1051,6 +1070,7 @@ void file_open(uint8_t secondary) {
 
   case OPEN_WRITE:
   case OPEN_APPEND:
+    DEBUG_PUTS_P("fopnw\r\n");
     open_write(&path, &dent, filetype, buf, (mode == OPEN_APPEND));
     break;
   }

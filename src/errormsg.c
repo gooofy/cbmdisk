@@ -54,7 +54,22 @@
 #include "progmem.h"
 #include "ustring.h"
 #include "utils.h"
+#include "uart.h"
 #include "errormsg.h"
+
+#define DEBUG_ERRORS
+
+#ifdef DEBUG_ERRORS
+# define DEBUG_PUTS_P(x) uart_puts_P(PSTR(x))
+# define DEBUG_PUTHEX(x) uart_puthex(x)
+# define DEBUG_PUTC(x)   uart_putc(x)
+# define DEBUG_FLUSH()   uart_flush()
+#else
+# define DEBUG_PUTS_P(x) do {} while (0)
+# define DEBUG_PUTHEX(x) do {} while (0)
+# define DEBUG_PUTC(x) do {} while (0)
+# define DEBUG_FLUSH() do {} while (0)
+#endif
 
 uint8_t current_error;
 uint8_t error_buffer[CONFIG_ERROR_BUFFER_SIZE];
@@ -199,6 +214,13 @@ void set_error(uint8_t errornum) {
 void set_error_ts(uint8_t errornum, uint8_t track, uint8_t sector) {
   uint8_t *msg = error_buffer;
   uint8_t i = 0;
+
+  if (errnum) {
+    DEBUG_PUTHEX(errornum);
+    DEBUG_PUTHEX(track);
+    DEBUG_PUTHEX(sector);
+    DEBUG_PUTS_P("ERRTS\r\n");
+  }
 
   current_error = errornum;
   buffers[ERRORBUFFER_IDX].data     = error_buffer;

@@ -572,15 +572,15 @@ static inline void goto_state(uint8_t state) {
     switch(fsm_state) {
         case STATE_IDLE:
             ieee488_CtrlPortsListen();
-            ieee488_SetNDAC(1);
             ieee488_SetNRFD(1);   
+            ieee488_SetNDAC(1);
             ieee488_DataListen();
             //DEBUG_PUTS_P("IDLE\r\n");
             break;
 
         case STATE_WAITNATN:
-            ieee488_SetNDAC(0);
             ieee488_SetNRFD(0);   
+            ieee488_SetNDAC(0);
             break;
 
         case STATE_LSN1:
@@ -772,28 +772,6 @@ void ieee_mainloop_fsm(void) {
                     cmd = ieee488_Data();
                     eoi = ieee488_EOI();
 
-                    goto_state (STATE_LSN3);
-                }
-                break;
-
-            case STATE_LSN3:
-                if (!ieee488_IFC()) {
-                    goto_state (STATE_IDLE);
-
-                } else if (ieee488_DAV()) {
-
-                    goto_state (STATE_LSN4);
-                }
-                break;
-
-            case STATE_LSN4:
-                if (!ieee488_IFC()) {
-                    goto_state (STATE_IDLE);
-                } else {
-
-                    // PET will wait for us while we have NRFD==0 so 
-                    // we have time to process commands here
-
                     DEBUG_PUTC('['); DEBUG_PUTHEX(cmd); DEBUG_PUTS_P("]\r\n");
 
                     if (open_active) {
@@ -814,6 +792,7 @@ void ieee_mainloop_fsm(void) {
                                 DEBUG_PUTS_P("DOSCMD\r\n");
                                 parse_doscommand();
                             } else {
+                                DEBUG_PUTHEX(cur_sa); 
                                 DEBUG_PUTS_P("FOPN\r\n");
                                 datacrc = 0xffff;                   // filename in command buffer
                                 file_open(cur_sa);
@@ -822,10 +801,22 @@ void ieee_mainloop_fsm(void) {
                         }
                     } else if (save_active) {
 
-                        if (!save_next_byte(cur_sa, cmd)) {
-                            save_active = 0;
-                            device_state = DEVICE_STATE_IDLE;
+                        if (cur_sa == 15) {
+                            // Receive commands and filenames
+                            if (command_length < CONFIG_COMMAND_BUFFER_SIZE)
+                                command_buffer[command_length++] = (char) cmd;
+                            if (!eoi) {
+                                DEBUG_PUTS_P("DOSCMD\r\n");
+                                parse_doscommand();
+                            }
+                        } else {
+                            if (!save_next_byte(cur_sa, cmd)) {
+                                DEBUG_PUTS_P("sberr\r\n");
+                                save_active = 0;
+                                device_state = DEVICE_STATE_IDLE;
+                            }
                         }
+
                         if (!eoi) {
                             save_active = 0;
                         }
@@ -880,6 +871,7 @@ void ieee_mainloop_fsm(void) {
 
                             } else if (device_state == DEVICE_STATE_LISTENER) {
                                 save_active = 1;
+                                command_length = 0;
                             }
 
                         } else if (cmd4 == IEEE_CLOSE) {      // CLOSE
@@ -910,9 +902,27 @@ void ieee_mainloop_fsm(void) {
                             DEBUG_PUTS_P("UKN\r\n");
                         }
                     }
+
                     //DEBUG_FLUSH();
                     //_delay_ms(1000);
+                    goto_state (STATE_LSN3);
+                }
+                break;
 
+            case STATE_LSN3:
+                if (!ieee488_IFC()) {
+                    goto_state (STATE_IDLE);
+
+                } else if (ieee488_DAV()) {
+
+                    goto_state (STATE_LSN4);
+                }
+                break;
+
+            case STATE_LSN4:
+                if (!ieee488_IFC()) {
+                    goto_state (STATE_IDLE);
+                } else {
                     if (do_tlk) {
                         goto_state (STATE_TLK1);
                     } else if (device_state != DEVICE_STATE_IDLE) {
@@ -923,14 +933,8 @@ void ieee_mainloop_fsm(void) {
                 }
                 break;
 
-            case STATE_WAITNDAV:
-                if (!ieee488_IFC() || ieee488_DAV()) {
-                    goto_state (STATE_IDLE);
-                }
-                break;
-
             case STATE_WAITNATN:
-                if (!ieee488_IFC() || !ieee488_ATN()) {
+                if (!ieee488_IFC() || ieee488_ATN()) {
                     goto_state (STATE_IDLE);
                 }
                 break;
