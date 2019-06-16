@@ -601,30 +601,48 @@ static inline void goto_state(uint8_t state) {
         case STATE_TLK1:
             ieee488_CtrlPortsTalk();
             ieee488_SetDAV(1);
-            ieee488_SetEOI(0);   
+            ieee488_SetEOI(1);   
             ieee488_DataTalk();
+            // DEBUG_PUTS_P("TLK1\r\n");
             break;
 
         case STATE_TLK2:
+            // ieee488_SetDAV(1);
+            // ieee488_SetEOI(1);   
+            // DEBUG_PUTS_P("TLK2\r\n");
             break;
 
         case STATE_TLK3:
+            // ieee488_SetDAV(1);
             ieee488_SetEOI(eoi);
             ieee488_SetData(data_out); 
+            // DEBUG_PUTS_P("TLK3\r\n");
             break;  
 
         case STATE_TLK4:
             ieee488_SetDAV(0);
+            ieee488_SetEOI(eoi);
+            ieee488_SetData(data_out); 
+            // DEBUG_PUTS_P("TLK4\r\n");
             break;  
 
         case STATE_TLK5:
+            // ieee488_SetDAV(0);
+            // ieee488_SetEOI(eoi);
+            // ieee488_SetData(data_out); 
+            // DEBUG_PUTS_P("TLK5\r\n");
             break;
 
         case STATE_TLK6:
             ieee488_SetDAV(1);
+            ieee488_SetEOI(1);
+            // DEBUG_PUTS_P("TLK6\r\n");
             break;
 
         case STATE_TLK7:
+            // ieee488_SetDAV(1);
+            // ieee488_SetEOI(1);
+            // DEBUG_PUTS_P("TLK7\r\n");
             break;
 
         case STATE_TLK8:
@@ -632,6 +650,7 @@ static inline void goto_state(uint8_t state) {
             ieee488_SetNDAC(1);
             ieee488_SetNRFD(1);   
             ieee488_DataListen();
+            // DEBUG_PUTS_P("TLK8\r\n");
             break;
     }
 }
